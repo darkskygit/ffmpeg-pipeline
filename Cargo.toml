@@ -1,0 +1,19 @@
+[workspace]
+members = ["packages/pipeline"]
+
+[workspace.dependencies]
+ffmpeg-pipeline = { path = "packages/pipeline" }
+image = { version = "0.25.0", default-features = false }
+log = "0.4.21"
+serde = { version = "1.0.194", features = ["derive"] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+lto = true
+panic = "abort"
+# opt-level = "z"
+codegen-units = 1
+incremental = false
+debug = true
