@@ -106,7 +106,7 @@ pub fn parse_video_stream_frame_count(
 
     let mut handler = input(&path)?;
     if let Some(stream) = handler.stream(stream_index as usize) {
-        let mut codec = Context::from_parameters(stream.parameters())?;
+        let codec = Context::from_parameters(stream.parameters())?;
         let mut video = codec.decoder().video()?;
 
         for (stream, packet) in handler.packets() {
@@ -214,7 +214,7 @@ mod tests {
 
         let paths = get_paths();
 
-        paths.iter().enumerate().for_each(|(i, file)| {
+        paths.par_iter().enumerate().for_each(|(i, file)| {
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 if let Err(e) = check_video_frame_count(file) {
                     println!("file {}: {}, error: {:?}", i, file.display(), e);
