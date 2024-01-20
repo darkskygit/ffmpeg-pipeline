@@ -63,42 +63,13 @@ pub fn parse_video_group(path: &Path, frame_calc: FrameCalculation) -> IoResult<
             let ts = Instant::now();
 
             if !matches!(frame_calc, FrameCalculation::Skip) {
-                let mut frame_count = 0;
-                let mut calc_frames = |decoder: &mut Video| match frame_calc {
-                    FrameCalculation::Skip => unreachable!(),
-                    FrameCalculation::Fast => {
-                        frame_count += 1;
-                    }
-                    FrameCalculation::Full => {
-                        let mut decoded = VideoFrame::empty();
-                        while decoder.receive_frame(&mut decoded).is_ok() {
-                            frame_count += 1;
-                        }
-                    }
-                };
-
-                for (stream, packet) in input(&path)?.packets() {
-                    if stream.index() != info.stream as usize {
-                        continue;
-                    }
-
-                    if matches!(frame_calc, FrameCalculation::Full) {
-                        video.send_packet(&packet)?;
-                    }
-
-                    calc_frames(&mut video);
-                }
-                if matches!(frame_calc, FrameCalculation::Full) {
-                    video.send_eof()?;
-                    calc_frames(&mut video);
-                }
-
-                info.frames = Some(frame_count);
+                info.frames =
+                    parse_video_stream_frame_count(&path, info.stream, frame_calc.clone())?;
             }
 
-            // if cfg!(not(debug_assertions)) {
-            //     info.cost = ts.elapsed();
-            // }
+            if cfg!(not(debug_assertions)) {
+                info.cost = ts.elapsed();
+            }
         }
 
         for (key, val) in stream.metadata().iter().filter(|(k, _)| *k != "language") {
@@ -111,11 +82,78 @@ pub fn parse_video_group(path: &Path, frame_calc: FrameCalculation) -> IoResult<
     Ok(groups)
 }
 
+pub fn parse_video_stream_frame_count(
+    path: &Path,
+    stream_index: u16,
+    frame_calc: FrameCalculation,
+) -> IoResult<Option<u64>> {
+    if matches!(frame_calc, FrameCalculation::Skip) {
+        return Ok(None);
+    }
+    let mut frame_count = 0;
+    let mut calc_frames = |decoder: &mut Video| match frame_calc {
+        FrameCalculation::Skip => unreachable!(),
+        FrameCalculation::Fast => {
+            frame_count += 1;
+        }
+        FrameCalculation::Full => {
+            let mut decoded = VideoFrame::empty();
+            while decoder.receive_frame(&mut decoded).is_ok() {
+                frame_count += 1;
+            }
+        }
+    };
+
+    let mut handler = input(&path)?;
+    if let Some(stream) = handler.stream(stream_index as usize) {
+        let mut codec = Context::from_parameters(stream.parameters())?;
+        let mut video = codec.decoder().video()?;
+
+        for (stream, packet) in handler.packets() {
+            if stream.index() != stream_index as usize {
+                continue;
+            }
+
+            if matches!(frame_calc, FrameCalculation::Full) {
+                video.send_packet(&packet)?;
+            }
+
+            calc_frames(&mut video);
+        }
+        if matches!(frame_calc, FrameCalculation::Full) {
+            video.send_eof()?;
+            calc_frames(&mut video);
+        }
+
+        Ok(Some(frame_count))
+    } else {
+        Ok(None)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use rayon::prelude::*;
-    use std::panic::{catch_unwind, AssertUnwindSafe};
+    use std::{
+        panic::{catch_unwind, AssertUnwindSafe},
+        path::PathBuf,
+    };
+
+    fn get_paths() -> Vec<PathBuf> {
+        std::fs::read_dir("../../tests/assets")
+            .unwrap()
+            .filter_map(|p| p.ok().map(|p| p.path()))
+            .filter(|p| {
+                p.is_file()
+                    && p.extension()
+                        .and_then(|s| s.to_str())
+                        .map(|s| s.to_lowercase())
+                        .unwrap_or_default()
+                        .ends_with("mkv")
+            })
+            .collect::<Vec<_>>()
+    }
 
     fn diff_video_groups(file: &Path) -> IoResult<()> {
         let info = parse_video_group(&file, FrameCalculation::Fast)?;
@@ -134,22 +172,51 @@ mod tests {
     fn test_parse_video_groups() {
         ffmpeg_init().unwrap();
 
-        let paths = std::fs::read_dir("../../tests/assets")
-            .unwrap()
-            .filter_map(|p| p.ok().map(|p| p.path()))
-            .filter(|p| {
-                p.is_file()
-                    && p.extension()
-                        .and_then(|s| s.to_str())
-                        .map(|s| s.to_lowercase())
-                        .unwrap_or_default()
-                        .ends_with("mkv")
-            })
-            .collect::<Vec<_>>();
+        let paths = get_paths();
 
         paths.par_iter().enumerate().for_each(|(i, file)| {
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 if let Err(e) = diff_video_groups(file) {
+                    println!("file {}: {}, error: {:?}", i, file.display(), e);
+                }
+            })) {
+                println!("file {}: {}, crash: {:?}", i, file.display(), e);
+            }
+        });
+    }
+
+    fn check_video_frame_count(file: &Path) -> IoResult<()> {
+        let info = parse_video_group(&file, FrameCalculation::Skip)?;
+        println!(
+            "parse cost: {:?}",
+            info.values()
+                .fold(std::time::Duration::new(0, 0), |acc, i| acc + i.cost)
+        );
+        let mut info = info
+            .values()
+            .filter(|i| i.stream_type == "Video")
+            .collect::<Vec<_>>();
+        info.sort_by(|a, b| a.stream.cmp(&b.stream));
+
+        for stream in info.iter() {
+            assert!(
+                parse_video_stream_frame_count(&file, stream.stream, FrameCalculation::Fast)?
+                    .is_some()
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_frame_counting() {
+        ffmpeg_init().unwrap();
+
+        let paths = get_paths();
+
+        paths.iter().enumerate().for_each(|(i, file)| {
+            if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
+                if let Err(e) = check_video_frame_count(file) {
                     println!("file {}: {}, error: {:?}", i, file.display(), e);
                 }
             })) {
