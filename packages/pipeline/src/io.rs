@@ -11,15 +11,18 @@ pub fn input<P: AsRef<Path>>(path: P) -> IoResult<Input> {
 }
 
 pub fn read_attachment<P: AsRef<Path>>(path: P, index: usize) -> IoResult<Vec<u8>> {
-    let mut input = input(&path)?;
+    let input = input(&path)?;
     let mut ret = Vec::new();
-    for (stream, packet) in input.packets() {
-        if stream.index() != index {
-            continue;
-        }
+    if let Some(stream) = input.stream(index) {
         if stream.parameters().medium() == media::Type::Attachment {
-            if let Some(data) = packet.data() {
-                ret.extend_from_slice(data);
+            let params = stream.parameters();
+            unsafe {
+                let data = (*params.as_ptr()).extradata as *const u8;
+                let size = (*params.as_ptr()).extradata_size as usize;
+
+                if !data.is_null() && size > 0 {
+                    ret.extend_from_slice(std::slice::from_raw_parts(data, size));
+                }
             }
         }
     }
@@ -30,5 +33,48 @@ pub fn read_attachment<P: AsRef<Path>>(path: P, index: usize) -> IoResult<Vec<u8
         ))
     } else {
         Ok(ret)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::*;
+    use rayon::prelude::*;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    #[test]
+    fn test_read_attachment() {
+        ffmpeg_init().unwrap();
+
+        let paths = std::fs::read_dir("/Users/ds/Resilio Sync/CG")
+            .unwrap()
+            .filter_map(|p| p.ok().map(|p| p.path()))
+            .filter(|p| {
+                p.is_file()
+                    && p.extension()
+                        .and_then(|s| s.to_str())
+                        .map(|s| s.to_lowercase())
+                        .unwrap_or_default()
+                        .ends_with("mkv")
+            })
+            .collect::<Vec<_>>();
+
+        paths.par_iter().for_each(|file| {
+            if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
+                match parse_video_group(&file, FrameCalculation::Skip) {
+                    Ok(groups) => {
+                        for group in groups.values() {
+                            if group.stream_type != "Attachment" {
+                                continue;
+                            }
+                            assert!(read_attachment(&file, group.stream as usize).is_ok());
+                        }
+                    }
+                    Err(e) => debug!("file {}: error: {:?}", file.display(), e),
+                }
+            })) {
+                debug!("file {}: crash: {:?}", file.display(), e);
+            }
+        });
     }
 }
