@@ -69,7 +69,7 @@ pub fn parse_stream_info(stream: &Stream) -> IoResult<VideoInfo> {
 pub fn parse_video_group(path: &Path, frame_calc: FrameCalculation) -> IoResult<VideoGroups> {
     let mut groups = VideoGroups::default();
 
-    for stream in input(&path)?.streams() {
+    for stream in open_file(&path)?.streams() {
         let mut info = parse_stream_info(&stream)?;
 
         if info.stream_type == "Video" {
@@ -113,7 +113,7 @@ pub fn parse_video_stream_frame_count(
         }
     };
 
-    let mut handler = input(&path)?;
+    let mut handler = open_file(&path)?;
     if let Some(stream) = handler.stream(stream_index as usize) {
         let codec = Context::from_parameters(stream.parameters())?;
         let mut video = codec.decoder().video()?;

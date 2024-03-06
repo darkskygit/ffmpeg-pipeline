@@ -11,19 +11,15 @@ pub struct Scaler {
 }
 
 impl Scaler {
-    pub fn new(info: &VideoInfo, dst_format: Pixel) -> IoResult<Self> {
-        debug!(
-            "stream: {}, size: {} x {}, pixel: {:?}",
-            info.stream, info.size.width, info.size.height, info.pixel
-        );
+    pub fn new(size: FrameSize, src_format: Pixel, dst_format: Pixel) -> IoResult<Self> {
         Ok(Self {
             scaler: ScalerContext::get(
-                info.pixel,
-                info.size.width as u32,
-                info.size.height as u32,
+                src_format,
+                size.width as u32,
+                size.height as u32,
                 dst_format,
-                info.size.width as u32,
-                info.size.height as u32,
+                size.width as u32,
+                size.height as u32,
                 ScalerFlags::SPLINE,
             )?,
         })
@@ -31,11 +27,15 @@ impl Scaler {
 
     pub fn new_from_stream(stream: &Stream, dst_format: Pixel) -> IoResult<Self> {
         let info = parse::parse_stream_info(stream)?;
-        Self::new(&info, dst_format)
+        debug!(
+            "stream: {}, size: {} x {}, pixel: {:?}",
+            info.stream, info.size.width, info.size.height, info.pixel
+        );
+        Self::new(info.size, info.pixel, dst_format)
     }
 
     pub fn new_from_path(path: &Path, index: usize, dst_format: Pixel) -> IoResult<Self> {
-        let input = input(path)?;
+        let input = open_file(path)?;
         let stream = input
             .stream(index)
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "Stream not found"))?;

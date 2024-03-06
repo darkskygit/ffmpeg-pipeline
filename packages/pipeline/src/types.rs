@@ -46,14 +46,14 @@ impl ToString for StreamFormat {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ImageSize {
+pub struct FrameSize {
     pub width: isize,
     pub height: isize,
 }
 
-impl ImageSize {
+impl FrameSize {
     pub fn new() -> Self {
-        ImageSize {
+        FrameSize {
             width: 0,
             height: 0,
         }
@@ -71,13 +71,13 @@ impl ImageSize {
     }
 }
 
-impl Default for ImageSize {
+impl Default for FrameSize {
     fn default() -> Self {
-        ImageSize::new()
+        FrameSize::new()
     }
 }
 
-impl Display for ImageSize {
+impl Display for FrameSize {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmtResult {
         write!(f, "{}x{}", self.width, self.height)
     }
@@ -95,7 +95,7 @@ pub struct VideoInfo {
     pub stream_type: String,
     #[serde(skip, default = "default_pixel")]
     pub pixel: Pixel,
-    pub size: ImageSize,
+    pub size: FrameSize,
     pub fps: Option<f64>,
     pub frames: Option<u64>,
     pub cost: Duration,
@@ -109,7 +109,7 @@ impl Default for VideoInfo {
             stream: 0,
             stream_type: "".into(),
             pixel: Pixel::None,
-            size: ImageSize::default(),
+            size: FrameSize::default(),
             fps: None,
             frames: None,
             cost: Duration::from_secs(0),

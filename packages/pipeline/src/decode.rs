@@ -1,10 +1,7 @@
 use super::*;
 use ffmpeg_next::{
     codec::{context::Context, decoder::Video as VideoDecoder},
-    format::{
-        context::{input::PacketIter, Input},
-        Pixel,
-    },
+    format::context::{input::PacketIter, Input},
     util::frame::video::Video as VideoFrame,
     Error as FFmpegError, Packet,
 };
@@ -27,14 +24,14 @@ pub enum Frame {
     Frame(VideoFrame),
 }
 
-pub struct FrameIterator<'i> {
+pub struct Frames<'i> {
     index: usize,
     video: VideoDecoder,
     packets: PacketIter<'i>,
     process: FrameProcess,
 }
 
-impl<'i> FrameIterator<'i> {
+impl<'i> Frames<'i> {
     pub fn new(
         handler: &'i mut Input,
         index: usize,
@@ -65,7 +62,7 @@ impl<'i> FrameIterator<'i> {
     }
 }
 
-impl Iterator for FrameIterator<'_> {
+impl Iterator for Frames<'_> {
     type Item = Frame;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -159,8 +156,8 @@ mod tests {
         let (tx2, rx2) = channel();
 
         let producer = thread::spawn(move || {
-            let mut input = input(path).unwrap();
-            let frames = FrameIterator::new(&mut input, index, FrameProcess::Decode)
+            let mut input = open_file(path).unwrap();
+            let frames = Frames::new(&mut input, index, FrameProcess::Decode)
                 .unwrap()
                 .unwrap();
 
@@ -171,7 +168,7 @@ mod tests {
         });
 
         let handler = thread::spawn(move || {
-            let mut scaler = Scaler::new_from_path(&path, index, Pixel::RGB24).unwrap();
+            let mut scaler = Scaler::new_from_path(&path, index, VideoPixel::RGB24).unwrap();
 
             for (idx, frame) in rx1
                 .iter()
