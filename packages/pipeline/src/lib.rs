@@ -1,11 +1,13 @@
+mod decode;
 mod io;
 mod parse;
-mod pipeline;
+mod scaler;
 mod types;
 
+pub use decode::FrameIterator;
 pub use io::read_attachment;
 pub use parse::parse_video_group;
-pub use pipeline::{FrameIterator, Scaler};
+pub use scaler::Scaler;
 
 use ffmpeg_next::sys::{av_log_set_level, AV_LOG_FATAL};
 use io::input;

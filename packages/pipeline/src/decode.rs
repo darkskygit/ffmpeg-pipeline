@@ -5,25 +5,41 @@ use ffmpeg_next::{
         context::{input::PacketIter, Input},
         Pixel,
     },
-    software::scaling::{context::Context as ScalerContext, flag::Flags as ScalerFlags},
     util::frame::video::Video as VideoFrame,
-    Error as FFmpegError, Stream,
+    Error as FFmpegError, Packet,
 };
 
 enum FrameStatus {
+    Raw(Packet),
     Decoded(VideoFrame),
     Eof,
     Error(isize, FFmpegError),
+}
+
+#[derive(PartialEq)]
+pub enum FrameProcess {
+    Passthrough,
+    Decode,
+}
+
+pub enum Frame {
+    Packet(Packet),
+    Frame(VideoFrame),
 }
 
 pub struct FrameIterator<'i> {
     index: usize,
     video: VideoDecoder,
     packets: PacketIter<'i>,
+    process: FrameProcess,
 }
 
 impl<'i> FrameIterator<'i> {
-    pub fn new(handler: &'i mut Input, index: usize) -> IoResult<Option<Self>> {
+    pub fn new(
+        handler: &'i mut Input,
+        index: usize,
+        process: FrameProcess,
+    ) -> IoResult<Option<Self>> {
         if let Some(stream) = handler.stream(index) {
             let codec = Context::from_parameters(stream.parameters())?;
             let video = codec.decoder().video()?;
@@ -33,6 +49,7 @@ impl<'i> FrameIterator<'i> {
                 index,
                 video,
                 packets,
+                process,
             }))
         } else {
             Ok(None)
@@ -49,7 +66,7 @@ impl<'i> FrameIterator<'i> {
 }
 
 impl Iterator for FrameIterator<'_> {
-    type Item = VideoFrame;
+    type Item = Frame;
 
     fn next(&mut self) -> Option<Self::Item> {
         let next_frame = loop {
@@ -57,13 +74,16 @@ impl Iterator for FrameIterator<'_> {
                 if stream.index() != self.index as usize {
                     continue;
                 }
-
-                if let Err(e) = self.video.send_packet(&packet) {
-                    break FrameStatus::Error(packet.position(), e);
-                }
-
-                if let Some(frame) = self.decode_frames() {
-                    break FrameStatus::Decoded(frame);
+                match self.process {
+                    FrameProcess::Passthrough => break FrameStatus::Raw(packet),
+                    FrameProcess::Decode => {
+                        if let Err(e) = self.video.send_packet(&packet) {
+                            break FrameStatus::Error(packet.position(), e);
+                        }
+                        if let Some(frame) = self.decode_frames() {
+                            break FrameStatus::Decoded(frame);
+                        }
+                    }
                 }
             } else {
                 break FrameStatus::Eof;
@@ -71,12 +91,17 @@ impl Iterator for FrameIterator<'_> {
         };
 
         match next_frame {
-            FrameStatus::Decoded(frame) => Some(frame),
+            FrameStatus::Raw(packet) => Some(Frame::Packet(packet)),
+            FrameStatus::Decoded(frame) => Some(Frame::Frame(frame)),
             FrameStatus::Eof => {
                 if let Err(e) = self.video.send_eof() {
                     warn!("Failed to send EOF to stream {}: {}", self.index, e);
                 }
-                self.decode_frames()
+                if self.process == FrameProcess::Decode {
+                    self.decode_frames().map(Frame::Frame)
+                } else {
+                    None
+                }
             }
             FrameStatus::Error(pos, e) => {
                 warn!(
@@ -86,49 +111,6 @@ impl Iterator for FrameIterator<'_> {
                 None
             }
         }
-    }
-}
-
-pub struct Scaler {
-    scaler: ScalerContext,
-}
-
-impl Scaler {
-    pub fn new(info: &VideoInfo, dst_format: Pixel) -> IoResult<Self> {
-        debug!(
-            "stream: {}, size: {} x {}, pixel: {:?}",
-            info.stream, info.size.width, info.size.height, info.pixel
-        );
-        Ok(Self {
-            scaler: ScalerContext::get(
-                info.pixel,
-                info.size.width as u32,
-                info.size.height as u32,
-                dst_format,
-                info.size.width as u32,
-                info.size.height as u32,
-                ScalerFlags::SPLINE,
-            )?,
-        })
-    }
-
-    pub fn new_from_stream(stream: &Stream, dst_format: Pixel) -> IoResult<Self> {
-        let info = parse::parse_stream_info(stream)?;
-        Self::new(&info, dst_format)
-    }
-
-    pub fn new_from_path(path: &Path, index: usize, dst_format: Pixel) -> IoResult<Self> {
-        let input = input(path)?;
-        let stream = input
-            .stream(index)
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "Stream not found"))?;
-        Self::new_from_stream(&stream, dst_format)
-    }
-
-    pub fn scale_frame(&mut self, frame: &VideoFrame) -> IoResult<VideoFrame> {
-        let mut rgb_frame = VideoFrame::empty();
-        self.scaler.run(frame, &mut rgb_frame)?;
-        Ok(rgb_frame)
     }
 }
 
@@ -178,7 +160,9 @@ mod tests {
 
         let producer = thread::spawn(move || {
             let mut input = input(path).unwrap();
-            let frames = FrameIterator::new(&mut input, index).unwrap().unwrap();
+            let frames = FrameIterator::new(&mut input, index, FrameProcess::Decode)
+                .unwrap()
+                .unwrap();
 
             for (idx, frame) in frames.enumerate() {
                 debug!("decoded {}", idx,);
@@ -189,7 +173,17 @@ mod tests {
         let handler = thread::spawn(move || {
             let mut scaler = Scaler::new_from_path(&path, index, Pixel::RGB24).unwrap();
 
-            for (idx, frame) in rx1.iter().enumerate() {
+            for (idx, frame) in rx1
+                .iter()
+                .filter_map(|frame| {
+                    if let Frame::Frame(frame) = frame {
+                        Some(frame)
+                    } else {
+                        None
+                    }
+                })
+                .enumerate()
+            {
                 debug!("scaling {}", idx);
                 let processed = scaler.scale_frame(&frame).unwrap();
                 tx2.send(processed)
