@@ -1,18 +1,28 @@
-
+use super::*;
 use ffmpeg_next::{
-    format::{context::Input, input_with_dictionary},
+    format::{
+        context::{Input, Output},
+        input_with_dictionary, output_with,
+    },
     media, Dictionary,
 };
-use std::{io::Result as IoResult, path::Path};
+use std::path::Path;
 
-pub fn open_file<P: AsRef<Path>>(path: P) -> IoResult<Input> {
+pub fn input_file<P: AsRef<Path>>(path: P) -> FFmpegResult<Input> {
     let mut options = Dictionary::new();
     options.set("max_streams", "8192");
     input_with_dictionary(&path, options).map_err(|e| e.into())
 }
 
-pub fn read_attachment<P: AsRef<Path>>(path: P, index: usize) -> IoResult<Vec<u8>> {
-    let input = open_file(&path)?;
+/// guess the output format from the file extension
+pub fn output_file<P: AsRef<Path>>(path: P) -> FFmpegResult<Output> {
+    let mut options = Dictionary::new();
+    options.set("max_streams", "8192");
+    output_with(&path, options).map_err(|e| e.into())
+}
+
+pub fn read_attachment<P: AsRef<Path>>(path: P, index: usize) -> FFmpegResult<Vec<u8>> {
+    let input = input_file(&path)?;
     let mut ret = Vec::new();
     if let Some(stream) = input.stream(index) {
         if stream.parameters().medium() == media::Type::Attachment {
@@ -28,10 +38,7 @@ pub fn read_attachment<P: AsRef<Path>>(path: P, index: usize) -> IoResult<Vec<u8
         }
     }
     if ret.is_empty() {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("attachment not found: {}", index),
-        ))
+        Err(FFmpegError::AttachmentNotFound(index))
     } else {
         Ok(ret)
     }
@@ -39,7 +46,7 @@ pub fn read_attachment<P: AsRef<Path>>(path: P, index: usize) -> IoResult<Vec<u8
 
 #[cfg(test)]
 mod tests {
-    use super::super::*;
+    use super::*;
     use rayon::prelude::*;
     use std::panic::{catch_unwind, AssertUnwindSafe};
 

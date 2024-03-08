@@ -1,18 +1,20 @@
 mod decode;
 mod io;
 mod parse;
+mod result;
 mod scaler;
 mod types;
 
-pub use decode::{Frame, FrameProcess, Frames};
+pub use decode::{Decoder, Frame, FrameProcess};
 pub use ffmpeg_next::format::Pixel as VideoPixel;
-pub use io::{open_file, read_attachment};
+pub use io::{input_file, output_file, read_attachment};
 pub use parse::parse_video_group;
+pub use result::{FFmpegError, FFmpegResult};
 pub use scaler::Scaler;
 
 use ffmpeg_next::sys::{av_log_set_level, AV_LOG_FATAL};
 use log::{debug, warn};
-use std::{error::Error, io::Result as IoResult, path::Path, time::Instant};
+use std::{error::Error, path::Path, time::Instant};
 use types::{FrameCalculation, FrameSize, StreamFormat, VideoGroups, VideoInfo};
 
 pub fn ffmpeg_init() -> Result<(), Box<dyn Error>> {

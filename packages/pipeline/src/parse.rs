@@ -15,7 +15,7 @@ fn adjust_precision_of_ratio(numerator: f64, denominator: f64) -> f64 {
     }
 }
 
-pub fn parse_stream_info(stream: &Stream) -> IoResult<VideoInfo> {
+pub fn parse_stream_info(stream: &Stream) -> FFmpegResult<VideoInfo> {
     let mut info = VideoInfo::default();
 
     info = info.stream(stream.index() as u16);
@@ -66,10 +66,10 @@ pub fn parse_stream_info(stream: &Stream) -> IoResult<VideoInfo> {
     Ok(info)
 }
 
-pub fn parse_video_group(path: &Path, frame_calc: FrameCalculation) -> IoResult<VideoGroups> {
+pub fn parse_video_group(path: &Path, frame_calc: FrameCalculation) -> FFmpegResult<VideoGroups> {
     let mut groups = VideoGroups::default();
 
-    for stream in open_file(&path)?.streams() {
+    for stream in input_file(&path)?.streams() {
         let mut info = parse_stream_info(&stream)?;
 
         if info.stream_type == "Video" {
@@ -95,7 +95,7 @@ pub fn parse_video_stream_frame_count(
     path: &Path,
     stream_index: u16,
     frame_calc: FrameCalculation,
-) -> IoResult<Option<u64>> {
+) -> FFmpegResult<Option<u64>> {
     if matches!(frame_calc, FrameCalculation::Skip) {
         return Ok(None);
     }
@@ -113,7 +113,7 @@ pub fn parse_video_stream_frame_count(
         }
     };
 
-    let mut handler = open_file(&path)?;
+    let mut handler = input_file(&path)?;
     if let Some(stream) = handler.stream(stream_index as usize) {
         let codec = Context::from_parameters(stream.parameters())?;
         let mut video = codec.decoder().video()?;
@@ -164,7 +164,7 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
-    fn diff_video_groups(file: &Path) -> IoResult<()> {
+    fn diff_video_groups(file: &Path) -> FFmpegResult<()> {
         let info = parse_video_group(&file, FrameCalculation::Fast)?;
         let info1 = parse_video_group(&file, FrameCalculation::Full)?;
         assert_json_diff::assert_json_matches_no_panic(
@@ -194,7 +194,7 @@ mod tests {
         });
     }
 
-    fn check_video_frame_count(file: &Path) -> IoResult<()> {
+    fn check_video_frame_count(file: &Path) -> FFmpegResult<()> {
         let info = parse_video_group(&file, FrameCalculation::Skip)?;
         debug!(
             "parse cost: {:?}",

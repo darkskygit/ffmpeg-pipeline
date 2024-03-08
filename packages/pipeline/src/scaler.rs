@@ -11,7 +11,7 @@ pub struct Scaler {
 }
 
 impl Scaler {
-    pub fn new(size: FrameSize, src_format: Pixel, dst_format: Pixel) -> IoResult<Self> {
+    pub fn new(size: FrameSize, src_format: Pixel, dst_format: Pixel) -> FFmpegResult<Self> {
         Ok(Self {
             scaler: ScalerContext::get(
                 src_format,
@@ -25,7 +25,7 @@ impl Scaler {
         })
     }
 
-    pub fn new_from_stream(stream: &Stream, dst_format: Pixel) -> IoResult<Self> {
+    pub fn new_from_stream(stream: &Stream, dst_format: Pixel) -> FFmpegResult<Self> {
         let info = parse::parse_stream_info(stream)?;
         debug!(
             "stream: {}, size: {} x {}, pixel: {:?}",
@@ -34,15 +34,15 @@ impl Scaler {
         Self::new(info.size, info.pixel, dst_format)
     }
 
-    pub fn new_from_path(path: &Path, index: usize, dst_format: Pixel) -> IoResult<Self> {
-        let input = open_file(path)?;
+    pub fn new_from_path(path: &Path, index: usize, dst_format: Pixel) -> FFmpegResult<Self> {
+        let input = input_file(path)?;
         let stream = input
             .stream(index)
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "Stream not found"))?;
+            .ok_or(FFmpegError::StreamNotFound(index))?;
         Self::new_from_stream(&stream, dst_format)
     }
 
-    pub fn scale_frame(&mut self, frame: &VideoFrame) -> IoResult<VideoFrame> {
+    pub fn scale_frame(&mut self, frame: &VideoFrame) -> FFmpegResult<VideoFrame> {
         let mut rgb_frame = VideoFrame::empty();
         self.scaler.run(frame, &mut rgb_frame)?;
         Ok(rgb_frame)

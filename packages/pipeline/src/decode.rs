@@ -24,19 +24,19 @@ pub enum Frame {
     Frame(VideoFrame),
 }
 
-pub struct Frames<'i> {
+pub struct Decoder<'i> {
     index: usize,
     video: VideoDecoder,
     packets: PacketIter<'i>,
     process: FrameProcess,
 }
 
-impl<'i> Frames<'i> {
+impl<'i> Decoder<'i> {
     pub fn new(
         handler: &'i mut Input,
         index: usize,
         process: FrameProcess,
-    ) -> IoResult<Option<Self>> {
+    ) -> FFmpegResult<Option<Self>> {
         if let Some(stream) = handler.stream(index) {
             let codec = Context::from_parameters(stream.parameters())?;
             let video = codec.decoder().video()?;
@@ -62,7 +62,7 @@ impl<'i> Frames<'i> {
     }
 }
 
-impl Iterator for Frames<'_> {
+impl Iterator for Decoder<'_> {
     type Item = Frame;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -156,8 +156,8 @@ mod tests {
         let (tx2, rx2) = channel();
 
         let producer = thread::spawn(move || {
-            let mut input = open_file(path).unwrap();
-            let frames = Frames::new(&mut input, index, FrameProcess::Decode)
+            let mut input = input_file(path).unwrap();
+            let frames = Decoder::new(&mut input, index, FrameProcess::Decode)
                 .unwrap()
                 .unwrap();
 
