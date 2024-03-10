@@ -2,8 +2,8 @@ use core::time;
 
 use super::*;
 use ffmpeg_next::{
-    codec::{context::Context, encoder::Video as VideoEncoder, Flags as CodecFlags, Id},
-    encoder,
+    codec::{context::Context, Flags as CodecFlags, Id},
+    encoder::{self, video::Video as VideoEncoder},
     format::{
         context::{input::PacketIter, Input, Output},
         stream::{Stream, StreamMut},
@@ -14,25 +14,23 @@ use ffmpeg_next::{
 };
 use image_tools::ImageSize;
 
-pub struct Encoder<'s> {
+pub struct Encoder {
     index: usize,
     context: Output,
-    stream: StreamMut<'s>,
     encoder: VideoEncoder,
 }
 
-impl Encoder<'_> {
-    pub fn new(context: Output, codec: Id) -> FFmpegResult<Self> {
+impl Encoder {
+    pub fn new(mut context: Output, codec: Id) -> FFmpegResult<Self> {
         let codec = encoder::find(codec).ok_or(FFmpegError::CodecNotFound(codec))?;
-        let mut stream = context.add_stream(codec)?;
-        let mut encoder = Context::from_parameters(stream.parameters())?
+        let stream = context.add_stream(codec)?;
+        let encoder = Context::from_parameters(stream.parameters())?
             .encoder()
             .video()?;
 
         Ok(Self {
-            index: 0,
+            index: stream.index(),
             context,
-            stream,
             encoder,
         })
     }
@@ -51,7 +49,7 @@ impl Encoder<'_> {
                 .flags()
                 .contains(FormatFlags::GLOBAL_HEADER);
             // copy params from source stream
-            let mut encoder = encoder.encoder;
+            let encoder = &mut encoder.encoder;
             encoder.set_height(decoder.height());
             encoder.set_width(decoder.width());
             encoder.set_aspect_ratio(decoder.aspect_ratio());

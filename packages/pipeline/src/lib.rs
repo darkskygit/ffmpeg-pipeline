@@ -12,12 +12,19 @@ pub use parse::parse_video_group;
 pub use result::{FFmpegError, FFmpegResult};
 pub use scaler::Scaler;
 
-use ffmpeg_next::sys::{av_log_set_level, AV_LOG_FATAL};
+use ffmpeg_next::{
+    ffi::AV_LOG_DEBUG,
+    sys::{av_log_set_level, AV_LOG_FATAL},
+};
 use log::{debug, warn};
 use std::{error::Error, path::Path, time::Instant};
 use types::{FrameCalculation, FrameSize, StreamFormat, VideoGroups, VideoInfo};
 
 pub fn ffmpeg_init() -> Result<(), Box<dyn Error>> {
-    unsafe { av_log_set_level(AV_LOG_FATAL as i32) }
+    if cfg!(debug_assertions) && false {
+        unsafe { av_log_set_level(AV_LOG_DEBUG as i32) }
+    } else {
+        unsafe { av_log_set_level(AV_LOG_FATAL as i32) }
+    }
     ffmpeg_next::init().map_err(|e| e.into())
 }

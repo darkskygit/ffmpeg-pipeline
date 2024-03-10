@@ -3,14 +3,14 @@ use ffmpeg_next::{
     codec::{context::Context, decoder::Video as VideoDecoder},
     format::context::{input::PacketIter, Input},
     util::frame::video::Video as VideoFrame,
-    Error as FFmpegError, Packet,
+    Error as FFmpegOrigError, Packet,
 };
 
 enum FrameStatus {
     Raw(Packet),
     Decoded(VideoFrame),
     Eof,
-    Error(isize, FFmpegError),
+    Error(isize, FFmpegOrigError),
 }
 
 #[derive(PartialEq)]
@@ -32,24 +32,20 @@ pub struct Decoder<'i> {
 }
 
 impl<'i> Decoder<'i> {
-    pub fn new(
-        handler: &'i mut Input,
-        index: usize,
-        process: FrameProcess,
-    ) -> FFmpegResult<Option<Self>> {
+    pub fn new(handler: &'i mut Input, index: usize, process: FrameProcess) -> FFmpegResult<Self> {
         if let Some(stream) = handler.stream(index) {
             let codec = Context::from_parameters(stream.parameters())?;
             let video = codec.decoder().video()?;
             let packets = handler.packets();
 
-            Ok(Some(Self {
+            Ok(Self {
                 index,
                 video,
                 packets,
                 process,
-            }))
+            })
         } else {
-            Ok(None)
+            Err(FFmpegError::StreamNotFound(index))
         }
     }
 
@@ -157,9 +153,7 @@ mod tests {
 
         let producer = thread::spawn(move || {
             let mut input = input_file(path).unwrap();
-            let frames = Decoder::new(&mut input, index, FrameProcess::Decode)
-                .unwrap()
-                .unwrap();
+            let frames = Decoder::new(&mut input, index, FrameProcess::Decode).unwrap();
 
             for (idx, frame) in frames.enumerate() {
                 debug!("decoded {}", idx,);
