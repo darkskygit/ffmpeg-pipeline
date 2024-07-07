@@ -162,7 +162,7 @@ mod tests {
         });
 
         let handler = thread::spawn(move || {
-            let mut scaler = Scaler::new_from_path(&path, index, VideoPixel::RGB24).unwrap();
+            let mut scaler = Scaler::from_path(&path, index, VideoPixel::RGB24).unwrap();
 
             for (idx, frame) in rx1
                 .iter()

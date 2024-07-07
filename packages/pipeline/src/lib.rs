@@ -18,7 +18,7 @@ use ffmpeg_next::{
 };
 use log::{debug, warn};
 use std::{error::Error, path::Path, time::Instant};
-use types::{FrameCalculation, FrameSize, StreamFormat, VideoGroups, VideoInfo};
+use types::{FrameCalculation, FrameSize, StreamFormat, VideoFrame, VideoGroups, VideoInfo};
 
 pub fn ffmpeg_init() -> Result<(), Box<dyn Error>> {
     if cfg!(debug_assertions) && false {

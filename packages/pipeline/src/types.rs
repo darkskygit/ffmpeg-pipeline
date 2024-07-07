@@ -8,6 +8,8 @@ use ffmpeg_next::format::Pixel;
 use log::warn;
 use serde::{Deserialize, Serialize};
 
+pub use ffmpeg_next::util::frame::video::Video as VideoFrame;
+
 #[derive(Default, Clone)]
 pub enum FrameCalculation {
     #[default]
