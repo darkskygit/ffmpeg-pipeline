@@ -9,7 +9,11 @@ use log::warn;
 use serde::{Deserialize, Serialize};
 
 pub use ffmpeg_next::{
-    format::Sample,
+    format::{
+        context::{Input, Output},
+        sample::Type as SampleType,
+        Sample,
+    },
     util::frame::{audio::Audio as AudioFrame, video::Video as VideoFrame},
     ChannelLayout, Stream,
 };

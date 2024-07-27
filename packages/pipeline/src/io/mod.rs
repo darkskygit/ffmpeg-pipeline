@@ -1,12 +1,16 @@
+mod buffer;
+
 use super::*;
+use buffer::BufferedInput;
 use ffmpeg_next::{
-    format::{
-        context::{Input, Output},
-        input_with_dictionary, output_with,
-    },
+    format::{input_with_dictionary, output_with},
     media, Dictionary,
 };
 use std::path::Path;
+
+pub fn input_buffer(data: Vec<u8>) -> FFmpegResult<BufferedInput> {
+    BufferedInput::new(data)
+}
 
 pub fn input_file<P: AsRef<Path>>(path: P) -> FFmpegResult<Input> {
     let mut options = Dictionary::new();
