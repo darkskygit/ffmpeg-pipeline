@@ -66,6 +66,20 @@ pub fn parse_stream_info(stream: &Stream) -> FFmpegResult<VideoInfo> {
     Ok(info)
 }
 
+pub fn parse_audio_spec(stream: &Stream) -> FFmpegResult<AudioSpec> {
+    let codec = Context::from_parameters(stream.parameters())?;
+    if codec.medium() == MediaType::Audio {
+        let decoder = codec.decoder().audio()?;
+        Ok(AudioSpec::new(
+            decoder.rate(),
+            decoder.format(),
+            decoder.channel_layout(),
+        ))
+    } else {
+        Err(FFmpegError::CodecNotFound(stream.parameters().id()))
+    }
+}
+
 pub fn parse_video_group(path: &Path, frame_calc: FrameCalculation) -> FFmpegResult<VideoGroups> {
     let mut groups = VideoGroups::default();
 

@@ -1,14 +1,26 @@
 use super::*;
 use ffmpeg_next::{
-    codec::{context::Context, decoder::Video as VideoDecoder},
+    codec::{
+        context::Context,
+        decoder::{Audio as AudioDecoder, Video as VideoDecoder},
+    },
     format::context::{input::PacketIter, Input},
-    util::frame::video::Video as VideoFrame,
     Error as FFmpegOrigError, Packet,
 };
 
+enum StreamDecoder {
+    Audio(AudioDecoder),
+    Video(VideoDecoder),
+}
+
+pub enum StreamFrame {
+    Audio(AudioFrame),
+    Video(VideoFrame),
+}
+
 enum FrameStatus {
     Raw(Packet),
-    Decoded(VideoFrame),
+    Decoded(StreamFrame),
     Eof,
     Error(isize, FFmpegOrigError),
 }
@@ -21,26 +33,30 @@ pub enum FrameProcess {
 
 pub enum Frame {
     Packet(Packet),
-    Frame(VideoFrame),
+    Frame(StreamFrame),
 }
 
 pub struct Decoder<'i> {
     index: usize,
-    video: VideoDecoder,
+    decoder: StreamDecoder,
     packets: PacketIter<'i>,
     process: FrameProcess,
 }
 
 impl<'i> Decoder<'i> {
-    pub fn new(handler: &'i mut Input, index: usize, process: FrameProcess) -> FFmpegResult<Self> {
+    pub fn new_with_video(
+        handler: &'i mut Input,
+        index: usize,
+        process: FrameProcess,
+    ) -> FFmpegResult<Self> {
         if let Some(stream) = handler.stream(index) {
             let codec = Context::from_parameters(stream.parameters())?;
-            let video = codec.decoder().video()?;
+            let decoder = StreamDecoder::Video(codec.decoder().video()?);
             let packets = handler.packets();
 
             Ok(Self {
                 index,
-                video,
+                decoder,
                 packets,
                 process,
             })
@@ -49,10 +65,41 @@ impl<'i> Decoder<'i> {
         }
     }
 
-    pub fn decode_frames(&mut self) -> Option<VideoFrame> {
-        let mut decoded = VideoFrame::empty();
-        while self.video.receive_frame(&mut decoded).is_ok() {
-            return Some(decoded);
+    pub fn new_with_audio(
+        handler: &'i mut Input,
+        index: usize,
+        process: FrameProcess,
+    ) -> FFmpegResult<Self> {
+        if let Some(stream) = handler.stream(index) {
+            let codec = Context::from_parameters(stream.parameters())?;
+            let decoder = StreamDecoder::Audio(codec.decoder().audio()?);
+            let packets = handler.packets();
+
+            Ok(Self {
+                index,
+                decoder,
+                packets,
+                process,
+            })
+        } else {
+            Err(FFmpegError::StreamNotFound(index))
+        }
+    }
+
+    pub fn decode_frames(&mut self) -> Option<StreamFrame> {
+        match self.decoder {
+            StreamDecoder::Audio(ref mut decoder) => {
+                let mut decoded = AudioFrame::empty();
+                if decoder.receive_frame(&mut decoded).is_ok() {
+                    return Some(StreamFrame::Audio(decoded));
+                }
+            }
+            StreamDecoder::Video(ref mut decoder) => {
+                let mut decoded = VideoFrame::empty();
+                if decoder.receive_frame(&mut decoded).is_ok() {
+                    return Some(StreamFrame::Video(decoded));
+                }
+            }
         }
         None
     }
@@ -70,8 +117,17 @@ impl Iterator for Decoder<'_> {
                 match self.process {
                     FrameProcess::Passthrough => break FrameStatus::Raw(packet),
                     FrameProcess::Decode => {
-                        if let Err(e) = self.video.send_packet(&packet) {
-                            break FrameStatus::Error(packet.position(), e);
+                        match self.decoder {
+                            StreamDecoder::Audio(ref mut decoder) => {
+                                if let Err(e) = decoder.send_packet(&packet) {
+                                    break FrameStatus::Error(packet.position(), e);
+                                }
+                            }
+                            StreamDecoder::Video(ref mut decoder) => {
+                                if let Err(e) = decoder.send_packet(&packet) {
+                                    break FrameStatus::Error(packet.position(), e);
+                                }
+                            }
                         }
                         if let Some(frame) = self.decode_frames() {
                             break FrameStatus::Decoded(frame);
@@ -87,7 +143,10 @@ impl Iterator for Decoder<'_> {
             FrameStatus::Raw(packet) => Some(Frame::Packet(packet)),
             FrameStatus::Decoded(frame) => Some(Frame::Frame(frame)),
             FrameStatus::Eof => {
-                if let Err(e) = self.video.send_eof() {
+                if let Err(e) = match self.decoder {
+                    StreamDecoder::Audio(ref mut decoder) => decoder.send_eof(),
+                    StreamDecoder::Video(ref mut decoder) => decoder.send_eof(),
+                } {
                     warn!("Failed to send EOF to stream {}: {}", self.index, e);
                 }
                 if self.process == FrameProcess::Decode {
@@ -110,6 +169,8 @@ impl Iterator for Decoder<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffmpeg_next::format::sample::Type;
+    use ffmpeg_next::ChannelLayout;
     use image::{ImageBuffer, Rgb};
     use std::path::{Path, PathBuf};
     use std::sync::mpsc::channel;
@@ -125,8 +186,7 @@ mod tests {
             ImageBuffer::from_raw(frame.width(), frame.height(), buffer).unwrap();
         debug!(
             "saving: {}",
-            std::env::current_dir()
-                .unwrap()
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("out1")
                 .join(format!("{}.png", index + 1))
                 .display()
@@ -142,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn test_frame_iterator() {
+    fn test_video_frame_iterator() {
         ffmpeg_init().unwrap();
 
         let path = Path::new("../../tests/assets/test.mkv");
@@ -153,7 +213,7 @@ mod tests {
 
         let producer = thread::spawn(move || {
             let mut input = input_file(path).unwrap();
-            let frames = Decoder::new(&mut input, index, FrameProcess::Decode).unwrap();
+            let frames = Decoder::new_with_video(&mut input, index, FrameProcess::Decode).unwrap();
 
             for (idx, frame) in frames.enumerate() {
                 debug!("decoded {}", idx,);
@@ -175,10 +235,14 @@ mod tests {
                 })
                 .enumerate()
             {
-                debug!("scaling {}", idx);
-                let processed = scaler.scale_frame(&frame).unwrap();
-                tx2.send(processed)
-                    .expect("Failed to send frame to stage 2");
+                if let StreamFrame::Video(frame) = frame {
+                    debug!("scaling {}", idx);
+                    let processed = scaler.scale_frame(&frame).unwrap();
+                    tx2.send(processed)
+                        .expect("Failed to send frame to stage 2");
+                } else {
+                    panic!("Unexpected frame type");
+                }
             }
         });
 
@@ -195,5 +259,31 @@ mod tests {
         debug!("handler finished");
         collector.join().expect("Collector thread panicked");
         debug!("collector finished");
+    }
+
+    #[test]
+    fn test_audio_frame_iterator() {
+        ffmpeg_init().unwrap();
+
+        let path = Path::new(r#"../../tests/assets/中恵光城-Brightly horizon.m4a"#);
+        let index = 0;
+
+        let mut input = input_file(path).unwrap();
+        let mut resampling = Resampler::new_from_stream(
+            &input.stream(index).unwrap(),
+            AudioSpec::new(48000, Sample::I16(Type::Planar), ChannelLayout::MONO),
+        )
+        .unwrap();
+        let frames = Decoder::new_with_audio(&mut input, index, FrameProcess::Decode).unwrap();
+
+        for (idx, frame) in frames.enumerate() {
+            let Frame::Frame(StreamFrame::Audio(frame)) = frame else {
+                panic!("Unexpected frame type");
+            };
+            let mut decoded = Vec::new();
+            let frame = resampling.resample(&frame).unwrap();
+            decoded.extend_from_slice(frame.plane::<i16>(0));
+            println!("decoded {}, frame: {}", idx, decoded.len());
+        }
     }
 }
