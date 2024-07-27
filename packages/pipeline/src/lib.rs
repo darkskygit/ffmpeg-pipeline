@@ -17,14 +17,20 @@ pub use types::{AudioFrame, ChannelLayout, Input, Output, Sample, SampleType, St
 
 use ffmpeg_next::sys::{av_log_set_level, AV_LOG_DEBUG, AV_LOG_FATAL};
 use log::{debug, warn};
-use std::{error::Error, path::Path, time::Instant};
+use std::{path::Path, sync::Once, time::Instant};
 use types::{FrameCalculation, FrameSize, StreamFormat, VideoGroups, VideoInfo};
 
-pub fn ffmpeg_init() -> Result<(), Box<dyn Error>> {
-    if cfg!(debug_assertions) && false {
-        unsafe { av_log_set_level(AV_LOG_DEBUG as i32) }
-    } else {
-        unsafe { av_log_set_level(AV_LOG_FATAL as i32) }
-    }
-    ffmpeg_next::init().map_err(|e| e.into())
+const FFMPEG_INIT: Once = Once::new();
+
+pub fn ffmpeg_init() {
+    FFMPEG_INIT.call_once(|| {
+        if cfg!(debug_assertions) && false {
+            unsafe { av_log_set_level(AV_LOG_DEBUG as i32) }
+        } else {
+            unsafe { av_log_set_level(AV_LOG_FATAL as i32) }
+        }
+        if let Err(e) = ffmpeg_next::init() {
+            warn!("Failed to initialize ffmpeg: {}", e);
+        }
+    });
 }
