@@ -1,21 +1,16 @@
 use super::*;
 use ffmpeg_next::{format::context, sys, Error};
-use std::{
-    ffi::c_void,
-    io::{Cursor, Read, Seek},
-    ptr::null_mut,
-};
+use std::{ffi::c_void, ptr::null_mut};
 
-pub struct BufferedInput {
-    _cursor: Box<Cursor<Vec<u8>>>,
+pub struct BufferedInput<R> {
+    _cursor: Box<R>,
     input: Input,
     io_ctx: Box<*mut sys::AVIOContext>,
 }
 
-impl BufferedInput {
-    pub fn new(data: Vec<u8>) -> FFmpegResult<Self> {
-        let cursor = Box::new(Cursor::new(data));
-
+impl<R: Read + Seek> BufferedInput<R> {
+    pub fn from_reader(reader: R) -> FFmpegResult<Self> {
+        let cursor = Box::new(reader);
         let (io_ctx, input) = Self::input_buffer(cursor.as_ref())?;
         Ok(Self {
             _cursor: cursor,
@@ -24,9 +19,7 @@ impl BufferedInput {
         })
     }
 
-    pub fn input_buffer(
-        cursor: &Cursor<Vec<u8>>,
-    ) -> FFmpegResult<(Box<*mut sys::AVIOContext>, Input)> {
+    pub fn input_buffer(cursor: &R) -> FFmpegResult<(Box<*mut sys::AVIOContext>, Input)> {
         let mut options = Dictionary::new();
         options.set("max_streams", "8192");
 
@@ -106,7 +99,7 @@ impl BufferedInput {
     }
 }
 
-impl Drop for BufferedInput {
+impl<R> Drop for BufferedInput<R> {
     fn drop(&mut self) {
         unsafe {
             sys::av_free(*self.io_ctx.as_ref() as *mut c_void);

@@ -6,10 +6,17 @@ use ffmpeg_next::{
     format::{input_with_dictionary, output_with},
     media, Dictionary,
 };
-use std::path::Path;
+use std::{
+    io::{Cursor, Read, Seek},
+    path::Path,
+};
 
-pub fn input_buffer(data: Vec<u8>) -> FFmpegResult<BufferedInput> {
-    BufferedInput::new(data)
+pub fn input_buffer(data: Vec<u8>) -> FFmpegResult<BufferedInput<Cursor<Vec<u8>>>> {
+    input_reader(Cursor::new(data))
+}
+
+pub fn input_reader<R: Read + Seek>(reader: R) -> FFmpegResult<BufferedInput<R>> {
+    BufferedInput::from_reader(reader)
 }
 
 pub fn input_file<P: AsRef<Path>>(path: P) -> FFmpegResult<Input> {
