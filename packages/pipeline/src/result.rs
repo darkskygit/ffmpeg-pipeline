@@ -17,4 +17,17 @@ pub enum FFmpegError {
     InvalidFrameType(String),
 }
 
+impl PartialEq<FFmpegError> for FFmpegError {
+    fn eq(&self, other: &FFmpegError) -> bool {
+        match (self, other) {
+            (FFmpegError::FFmpeg(e1), FFmpegError::FFmpeg(e2)) => e1 == e2,
+            (FFmpegError::AttachmentNotFound(e1), FFmpegError::AttachmentNotFound(e2)) => e1 == e2,
+            (FFmpegError::StreamNotFound(e1), FFmpegError::StreamNotFound(e2)) => e1 == e2,
+            (FFmpegError::CodecNotFound(e1), FFmpegError::CodecNotFound(e2)) => e1 == e2,
+            (FFmpegError::InvalidFrameType(e1), FFmpegError::InvalidFrameType(e2)) => e1 == e2,
+            _ => false,
+        }
+    }
+}
+
 pub type FFmpegResult<T> = Result<T, FFmpegError>;
