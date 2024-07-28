@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_video_frame_iterator() {
-        ffmpeg_init().unwrap();
+        ffmpeg_init();
 
         let path = Path::new("../../tests/assets/test.mkv");
         let index = 5;
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_audio_frame_iterator() {
-        ffmpeg_init().unwrap();
+        ffmpeg_init();
 
         let buffer = read(r#"../../tests/assets/中恵光城-Brightly horizon.m4a"#).unwrap();
         let index = 0;

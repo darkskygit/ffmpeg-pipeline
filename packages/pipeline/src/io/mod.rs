@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_read_attachment() {
-        ffmpeg_init().unwrap();
+        ffmpeg_init();
 
         let paths = std::fs::read_dir("/Users/ds/Resilio Sync/CG")
             .unwrap()

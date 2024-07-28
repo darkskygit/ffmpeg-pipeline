@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_parse_video_groups() {
-        ffmpeg_init().unwrap();
+        ffmpeg_init();
 
         let paths = get_paths();
 
@@ -233,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_frame_counting() {
-        ffmpeg_init().unwrap();
+        ffmpeg_init();
 
         let paths = get_paths();
 

@@ -24,13 +24,17 @@ const FFMPEG_INIT: Once = Once::new();
 
 pub fn ffmpeg_init() {
     FFMPEG_INIT.call_once(|| {
-        if cfg!(debug_assertions) && false {
-            unsafe { av_log_set_level(AV_LOG_DEBUG as i32) }
-        } else {
-            unsafe { av_log_set_level(AV_LOG_FATAL as i32) }
-        }
-        if let Err(e) = ffmpeg_next::init() {
+        if let Err(e) = ffmpeg_init_explicit() {
             warn!("Failed to initialize ffmpeg: {}", e);
         }
     });
+}
+
+pub fn ffmpeg_init_explicit() -> Result<(), ffmpeg_next::Error> {
+    if cfg!(debug_assertions) && false {
+        unsafe { av_log_set_level(AV_LOG_DEBUG as i32) }
+    } else {
+        unsafe { av_log_set_level(AV_LOG_FATAL as i32) }
+    }
+    ffmpeg_next::init()
 }
