@@ -4,7 +4,6 @@ use ffmpeg_next::{
     encoder::{self, video::Video as VideoEncoder},
     format::{context::Output, stream::Stream, Flags as FormatFlags},
 };
-use image_tools::ImageSize;
 
 pub struct Encoder {
     index: usize,
@@ -56,7 +55,7 @@ impl Encoder {
         Ok(encoder)
     }
 
-    pub fn set_size(&mut self, size: ImageSize) {
+    pub fn set_size(&mut self, size: FrameSize) {
         self.encoder.set_height(size.height as u32);
         self.encoder.set_width(size.width as u32);
     }
@@ -68,7 +67,7 @@ mod tests {
 
     #[test]
     fn test_encode_file() {
-        let mut output = output_file("./test.mp4").unwrap();
+        let mut output = output_file("../../tests/assets/test.mp4").unwrap();
         let mut encoder = Encoder::new(output, Id::H264).unwrap();
     }
 }
