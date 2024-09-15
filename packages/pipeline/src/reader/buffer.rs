@@ -76,26 +76,15 @@ impl BufferedInput {
         let ctx = &mut *(opaque as *mut AVIOContextData);
         let slice = std::slice::from_raw_parts_mut(buf, buf_size as usize);
         match ctx.cursor.read(slice) {
-            Ok(size) => {
-                debug!(
-                    "read {} bytes: {:?}, pos: {}",
-                    size,
-                    &slice[0..size.min(32)],
-                    ctx.cursor.stream_position().unwrap()
-                );
-                if size == 0 {
-                    sys::AVERROR_EOF
-                } else {
-                    size as i32
-                }
-            }
+            Ok(size) => (size != 0)
+                .then_some(size as i32)
+                .unwrap_or(sys::AVERROR_EOF),
             Err(_) => -1,
         }
     }
 
     unsafe extern "C" fn seek(opaque: *mut std::os::raw::c_void, offset: i64, whence: i32) -> i64 {
         let ctx = &mut *(opaque as *mut AVIOContextData);
-        println!("seek: {}, {}", offset, whence);
         match whence {
             sys::AVSEEK_SIZE => ctx.length as i64,
             _ => {
