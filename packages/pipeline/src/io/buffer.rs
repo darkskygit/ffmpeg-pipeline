@@ -1,34 +1,45 @@
 use super::*;
 use ffmpeg_next::{format::context, sys, Error};
-use std::{ffi::c_void, ptr::null_mut};
+use std::{ffi::c_void, io::SeekFrom, ptr::null_mut};
 
-pub struct BufferedInput<R> {
-    _cursor: Box<R>,
+pub struct BufferedInput {
+    _ctx: Box<AVIOContextData>,
     input: Input,
     io_ctx: Box<*mut sys::AVIOContext>,
 }
 
-impl<R: Read + Seek> BufferedInput<R> {
-    pub fn from_reader(reader: R) -> FFmpegResult<Self> {
-        let cursor = Box::new(reader);
-        let (io_ctx, input) = Self::input_buffer(cursor.as_ref())?;
+pub trait Readable: std::io::Read + std::io::Seek {}
+
+impl<T: std::io::Read + std::io::Seek> Readable for T {}
+
+pub struct AVIOContextData {
+    cursor: Box<dyn Readable>,
+    length: u64,
+}
+
+impl BufferedInput {
+    pub fn from_reader(mut reader: impl Readable + 'static) -> FFmpegResult<Self> {
+        let length = reader.stream_len()?;
+        let cursor = Box::new(reader) as Box<dyn Readable>;
+        let ctx = Box::new(AVIOContextData { cursor, length });
+        let (io_ctx, input) = Self::input_buffer(ctx.as_ref())?;
         Ok(Self {
-            _cursor: cursor,
+            _ctx: ctx,
             input,
             io_ctx,
         })
     }
 
-    pub fn input_buffer(cursor: &R) -> FFmpegResult<(Box<*mut sys::AVIOContext>, Input)> {
+    fn input_buffer(ctx: &AVIOContextData) -> FFmpegResult<(Box<*mut sys::AVIOContext>, Input)> {
         let mut options = Dictionary::new();
         options.set("max_streams", "8192");
 
         unsafe {
             let avio_ctx = sys::avio_alloc_context(
-                sys::av_malloc(4096) as *mut u8, // buffer size
-                4096,                            // buffer size
-                0,                               // write flag, 0 means read-only
-                cursor as *const _ as *mut _,
+                sys::av_malloc(4096) as *mut u8,
+                4096,
+                0,
+                ctx as *const _ as *mut _,
                 Some(Self::read),
                 None,
                 Some(Self::seek),
@@ -62,27 +73,40 @@ impl<R: Read + Seek> BufferedInput<R> {
         buf: *mut u8,
         buf_size: i32,
     ) -> i32 {
-        let cursor = &mut *(opaque as *mut Cursor<Vec<u8>>);
+        let ctx = &mut *(opaque as *mut AVIOContextData);
         let slice = std::slice::from_raw_parts_mut(buf, buf_size as usize);
-        match cursor.read(slice) {
-            Ok(size) => size as i32,
-            Err(_) => -1, // return -1 indicates a read error
+        match ctx.cursor.read(slice) {
+            Ok(size) => {
+                debug!(
+                    "read {} bytes: {:?}, pos: {}",
+                    size,
+                    &slice[0..size.min(32)],
+                    ctx.cursor.stream_position().unwrap()
+                );
+                if size == 0 {
+                    sys::AVERROR_EOF
+                } else {
+                    size as i32
+                }
+            }
+            Err(_) => -1,
         }
     }
 
     unsafe extern "C" fn seek(opaque: *mut std::os::raw::c_void, offset: i64, whence: i32) -> i64 {
-        let cursor = &mut *(opaque as *mut Cursor<Vec<u8>>);
+        let ctx = &mut *(opaque as *mut AVIOContextData);
+        println!("seek: {}, {}", offset, whence);
         match whence {
-            sys::AVSEEK_SIZE => cursor.get_ref().len() as i64,
+            sys::AVSEEK_SIZE => ctx.length as i64,
             _ => {
                 let pos = match whence {
-                    sys::SEEK_SET => std::io::SeekFrom::Start(offset as u64),
-                    sys::SEEK_CUR => std::io::SeekFrom::Current(offset),
-                    sys::SEEK_END => std::io::SeekFrom::End(offset),
+                    sys::SEEK_SET => SeekFrom::Start(offset as u64),
+                    sys::SEEK_CUR => SeekFrom::Current(offset),
+                    sys::SEEK_END => SeekFrom::End(offset),
                     _ => return -1,
                 };
 
-                match cursor.seek(pos) {
+                match ctx.cursor.seek(pos) {
                     Ok(pos) => pos as i64,
                     Err(_) => -1,
                 }
@@ -99,10 +123,41 @@ impl<R: Read + Seek> BufferedInput<R> {
     }
 }
 
-impl<R> Drop for BufferedInput<R> {
+impl Drop for BufferedInput {
     fn drop(&mut self) {
         unsafe {
-            sys::av_free(*self.io_ctx.as_ref() as *mut c_void);
+            sys::av_free((*self.io_ctx) as *mut c_void);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{fs::File, io::Read, path::Path};
+
+    #[test]
+    fn test_buffered_input() {
+        let path = Path::new("../../tests/assets/中恵光城-Brightly horizon.m4a");
+        let mut file = File::open(path).unwrap();
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).unwrap();
+
+        let mut input = BufferedInput::from_reader(Cursor::new(data)).unwrap();
+        let frames = Decoder::new_with_audio(input.as_mut(), 0, FrameProcess::Decode).unwrap();
+
+        for (idx, frame) in frames.enumerate() {
+            match frame {
+                Frame::Frame(StreamFrame::Audio(audio)) => {
+                    println!("frame: {:?}", audio.format());
+                }
+                Frame::Frame(StreamFrame::Video(video)) => {
+                    println!("frame: {:?}", video.format());
+                }
+                Frame::Packet(_) => {
+                    println!("packet: {}", idx);
+                }
+            }
         }
     }
 }

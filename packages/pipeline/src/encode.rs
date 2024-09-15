@@ -1,16 +1,8 @@
-use core::time;
-
 use super::*;
 use ffmpeg_next::{
     codec::{context::Context, Flags as CodecFlags, Id},
     encoder::{self, video::Video as VideoEncoder},
-    format::{
-        context::{input::PacketIter, Input, Output},
-        stream::{Stream, StreamMut},
-        Flags as FormatFlags,
-    },
-    util::frame::video::Video as VideoFrame,
-    Packet, Rational,
+    format::{context::Output, stream::Stream, Flags as FormatFlags},
 };
 use image_tools::ImageSize;
 

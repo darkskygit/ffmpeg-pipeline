@@ -1,7 +1,7 @@
 mod buffer;
 
 use super::*;
-use buffer::BufferedInput;
+use buffer::{BufferedInput, Readable};
 use ffmpeg_next::{
     format::{input_with_dictionary, output_with},
     media, Dictionary,
@@ -11,11 +11,11 @@ use std::{
     path::Path,
 };
 
-pub fn input_buffer(data: Vec<u8>) -> FFmpegResult<BufferedInput<Cursor<Vec<u8>>>> {
+pub fn input_buffer(data: Vec<u8>) -> FFmpegResult<BufferedInput> {
     input_reader(Cursor::new(data))
 }
 
-pub fn input_reader<R: Read + Seek>(reader: R) -> FFmpegResult<BufferedInput<R>> {
+pub fn input_reader<R: Readable + 'static>(reader: R) -> FFmpegResult<BufferedInput> {
     BufferedInput::from_reader(reader)
 }
 

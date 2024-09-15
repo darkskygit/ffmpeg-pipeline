@@ -1,3 +1,5 @@
+#![feature(seek_stream_len)]
+
 mod decode;
 mod io;
 mod parse;
