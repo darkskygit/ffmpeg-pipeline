@@ -9,10 +9,11 @@ use ffmpeg_next::{
 
 pub enum EncodeParams {
     Audio {
-        rate: i32,
+        bitrate: usize,
         channel_layout: ChannelLayout,
-        time_base: Rational,
         global_header: bool,
+        rate: i32,
+        time_base: Rational,
     },
     Video {
         time_base: Rational,
@@ -27,15 +28,37 @@ impl EncodeParams {
             EncodeParams::Video { time_base, .. } => *time_base,
         }
     }
+
+    pub fn with_bitrate(self, bitrate: usize) -> Self {
+        if let Self::Audio {
+            channel_layout,
+            global_header,
+            rate,
+            time_base,
+            ..
+        } = self
+        {
+            Self::Audio {
+                bitrate,
+                channel_layout,
+                global_header,
+                rate,
+                time_base,
+            }
+        } else {
+            self
+        }
+    }
 }
 
 impl Default for EncodeParams {
     fn default() -> Self {
         EncodeParams::Audio {
-            rate: 44100,
+            bitrate: 128 * 1024,
             channel_layout: ChannelLayout::STEREO,
-            time_base: Rational::new(1, 44100),
             global_header: false,
+            rate: 44100,
+            time_base: Rational::new(1, 44100),
         }
     }
 }
@@ -44,6 +67,7 @@ impl From<&Decoder<'_>> for EncodeParams {
     fn from(decoder: &Decoder<'_>) -> Self {
         match decoder.get_decoder() {
             StreamDecoder::Audio(decoder) => EncodeParams::Audio {
+                bitrate: decoder.bit_rate(),
                 rate: decoder.rate() as i32,
                 channel_layout: decoder.channel_layout(),
                 time_base: decoder.time_base(),
@@ -74,10 +98,11 @@ impl Encoder {
 
         let encoder = match codec_params {
             EncodeParams::Audio {
-                rate,
+                bitrate,
                 channel_layout,
-                time_base,
                 global_header,
+                rate,
+                time_base,
             } if codec.is_audio() => {
                 let codec = codec.audio()?;
                 let mut encoder = encoder.audio()?;
@@ -96,6 +121,8 @@ impl Encoder {
                             .copied()
                     })
                     .unwrap_or(rate);
+                encoder.set_bit_rate(bitrate);
+                encoder.set_channel_layout(channel_layout);
                 encoder.set_format(
                     codec
                         .formats()
@@ -104,7 +131,6 @@ impl Encoder {
                         .unwrap(),
                 );
                 encoder.set_rate(rate);
-                encoder.set_channel_layout(channel_layout);
                 encoder.set_time_base(time_base);
                 if global_header {
                     encoder.set_flags(CodecFlags::GLOBAL_HEADER);
@@ -232,7 +258,7 @@ mod tests {
         let mut encoder = Encoder::new(
             output_file("../../tests/tmp/test.opus").unwrap(),
             Id::OPUS,
-            (&decoder).into(),
+            EncodeParams::from(&decoder).with_bitrate(128 * 1024),
         )
         .unwrap();
 
