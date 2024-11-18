@@ -9,17 +9,20 @@ mod result;
 mod scaler;
 mod types;
 
-pub use decode::{Decoder, Frame, FrameProcess, StreamFrame};
+pub use decode::{Decoder, Frame, FrameProcess};
 pub use ffmpeg_next::format::Pixel as VideoPixel;
 pub use parse::parse_video_group;
 pub use reader::{input_buffer, input_file, input_reader, output_file, read_attachment};
 pub use resampling::{AudioSpec, Resampler};
 pub use result::{FFmpegError, FFmpegResult};
 pub use scaler::Scaler;
-pub use types::{AudioFrame, ChannelLayout, Input, Output, Sample, SampleType, Stream, VideoFrame};
+pub use types::{
+    AudioFrame, ChannelLayout, Input, Output, Sample, SampleType, Stream, StreamDecoder,
+    StreamEncoder, StreamFrame, VideoFrame,
+};
 
 use ffmpeg_next::sys::{av_log_set_level, AV_LOG_DEBUG, AV_LOG_FATAL};
-use log::{debug, warn};
+use log::{debug, error, warn};
 use std::{path::Path, sync::Once, time::Instant};
 use types::{FrameCalculation, FrameSize, StreamFormat, VideoGroups, VideoInfo};
 

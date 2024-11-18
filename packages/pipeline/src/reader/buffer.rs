@@ -143,6 +143,9 @@ mod tests {
                 Frame::Frame(StreamFrame::Video(video)) => {
                     println!("frame: {:?}", video.format());
                 }
+                Frame::Frame(StreamFrame::Eof) => {
+                    println!("eof");
+                }
                 Frame::Packet(_) => {
                     println!("packet: {}", idx);
                 }

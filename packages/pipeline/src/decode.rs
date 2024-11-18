@@ -8,16 +8,6 @@ use ffmpeg_next::{
     Error as FFmpegOrigError, Packet,
 };
 
-enum StreamDecoder {
-    Audio(AudioDecoder),
-    Video(VideoDecoder),
-}
-
-pub enum StreamFrame {
-    Audio(AudioFrame),
-    Video(VideoFrame),
-}
-
 enum FrameStatus {
     Raw(Packet),
     Decoded(StreamFrame),
@@ -86,11 +76,17 @@ impl<'i> Decoder<'i> {
         }
     }
 
+    pub fn get_decoder(&self) -> &StreamDecoder {
+        &self.decoder
+    }
+
     pub fn decode_frames(&mut self) -> Option<StreamFrame> {
         match self.decoder {
             StreamDecoder::Audio(ref mut decoder) => {
                 let mut decoded = AudioFrame::empty();
                 if decoder.receive_frame(&mut decoded).is_ok() {
+                    let timestamp = decoded.timestamp();
+                    decoded.set_pts(timestamp);
                     return Some(StreamFrame::Audio(decoded));
                 }
             }
@@ -266,6 +262,7 @@ mod tests {
 
         let buffer = read(r#"../../tests/assets/中恵光城-Brightly horizon.m4a"#).unwrap();
         let index = 0;
+        println!("buffer: {}", buffer.len());
 
         let mut input = input_buffer(buffer).unwrap();
         let mut resampling = Resampler::new_from_stream(

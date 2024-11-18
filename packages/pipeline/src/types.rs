@@ -9,6 +9,8 @@ use log::warn;
 use serde::{Deserialize, Serialize};
 
 pub use ffmpeg_next::{
+    decoder::{Audio as AudioDecoder, Video as VideoDecoder},
+    encoder::{Audio as AudioEncoder, Video as VideoEncoder},
     format::{
         context::{Input, Output},
         sample::Type as SampleType,
@@ -52,6 +54,32 @@ impl ToString for StreamFormat {
             }
         }
         .into()
+    }
+}
+
+pub enum StreamDecoder {
+    Audio(AudioDecoder),
+    Video(VideoDecoder),
+}
+
+pub enum StreamEncoder {
+    Audio(AudioEncoder),
+    Video(VideoEncoder),
+}
+
+pub enum StreamFrame {
+    Audio(AudioFrame),
+    Video(VideoFrame),
+    Eof,
+}
+
+impl ToString for StreamFrame {
+    fn to_string(&self) -> String {
+        match self {
+            StreamFrame::Audio(_) => "Audio".into(),
+            StreamFrame::Video(_) => "Video".into(),
+            StreamFrame::Eof => "Eof".into(),
+        }
     }
 }
 
