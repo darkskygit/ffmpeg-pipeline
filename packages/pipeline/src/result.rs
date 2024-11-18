@@ -15,6 +15,8 @@ pub enum FFmpegError {
     CodecNotFound(Id),
     #[error("Invalid frame type: {0}")]
     InvalidFrameType(String),
+    #[error("Invalid stream type: {0}")]
+    InvalidStreamType(String),
 }
 
 impl PartialEq<FFmpegError> for FFmpegError {

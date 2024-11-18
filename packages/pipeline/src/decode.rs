@@ -1,9 +1,6 @@
 use super::*;
 use ffmpeg_next::{
-    codec::{
-        context::Context,
-        decoder::{Audio as AudioDecoder, Video as VideoDecoder},
-    },
+    codec::context::Context,
     format::context::{input::PacketIter, Input},
     Error as FFmpegOrigError, Packet,
 };

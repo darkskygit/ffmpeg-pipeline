@@ -97,7 +97,7 @@ impl BufferedInput {
 
                 match ctx.cursor.seek(pos) {
                     Ok(pos) => pos as i64,
-                    Err(_) => -1,
+                    Err(_e) => -1,
                 }
             }
         }
