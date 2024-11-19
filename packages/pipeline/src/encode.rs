@@ -258,42 +258,35 @@ mod tests {
         let mut encoder = Encoder::new(
             output_file("../../tests/tmp/test.opus").unwrap(),
             Id::OPUS,
-            EncodeParams::from(&decoder).with_bitrate(128 * 1024),
+            EncodeParams::from(&decoder).with_bitrate(64 * 1024),
         )
         .unwrap();
+        let mut buffer = audio_buffer(&decoder, &encoder).unwrap();
 
-        let target_spec = AudioSpec::new(
-            ChannelLayout::STEREO,
-            Sample::F32(SampleType::Planar),
-            48000,
-        );
-        let mut resampling = Resampler::new(&decoder, &target_spec).unwrap();
-        let mut buffer = audio_buffer(&target_spec, &encoder).unwrap();
-
-        // output.set_metadata(input.metadata().to_owned());
         encoder.write_header().unwrap();
 
+        let mut buffer_out = buffer.get("out").unwrap();
+        let mut receive_buffered_frame = || {
+            let mut filtered = AudioFrame::empty();
+            while buffer_out.sink().frame(&mut filtered).is_ok() {
+                encoder.send_frame(&StreamFrame::Audio(filtered.clone()))?;
+                encoder.encode_frame()?;
+            }
+            Ok::<(), FFmpegError>(())
+        };
+
+        let mut buffer_in = buffer.get("in").unwrap();
+        let mut buffer_in_src = buffer_in.source();
         for (idx, frame) in decoder.enumerate() {
             let Frame::Frame(StreamFrame::Audio(frame)) = frame else {
                 panic!("Unexpected frame type");
             };
-
-            buffer
-                .get("in")
-                .unwrap()
-                .source()
-                .add(&resampling.resample(&frame).unwrap())
-                .unwrap();
-
-            let mut filtered = AudioFrame::empty();
-            let mut ctx = buffer.get("out").unwrap();
-            while ctx.sink().frame(&mut filtered).is_ok() {
-                encoder
-                    .send_frame(&StreamFrame::Audio(filtered.clone()))
-                    .unwrap();
-                encoder.encode_frame().unwrap();
-            }
+            buffer_in_src.add(&frame).unwrap();
+            receive_buffered_frame().unwrap();
         }
+        buffer_in_src.flush().unwrap();
+        receive_buffered_frame().unwrap();
+
         encoder.send_frame(&StreamFrame::Eof).unwrap();
         encoder.encode_frame().unwrap();
     }
