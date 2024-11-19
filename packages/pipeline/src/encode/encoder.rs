@@ -36,7 +36,7 @@ impl Encoder {
                 let channel_layout = codec
                     .channel_layouts()
                     .map(|cls| cls.best(channel_layout.channels()))
-                    .unwrap_or(ChannelLayout::STEREO);
+                    .unwrap_or(channel_layout);
                 let rate = codec
                     .rates()
                     .and_then(|rates| {
@@ -116,6 +116,13 @@ impl Encoder {
 
     pub fn get_encoder(&self) -> &StreamEncoder {
         &self.encoder
+    }
+
+    pub fn set_metadata(&mut self, key: &str, value: &str) {
+        let mut stream = self.output.stream_mut(self.index).unwrap();
+        let mut metadata = stream.metadata().to_owned();
+        metadata.set(key, value);
+        stream.set_metadata(metadata);
     }
 
     pub fn write_header(&mut self) -> FFmpegResult<()> {

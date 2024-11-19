@@ -32,6 +32,7 @@ mod tests {
         .unwrap();
         let mut buffer = audio_buffer(&decoder, &encoder).unwrap();
 
+        encoder.set_metadata("encoder", "ffmpeg");
         encoder.write_header().unwrap();
 
         let mut buffer_out = buffer.get("out").unwrap();
