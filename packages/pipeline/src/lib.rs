@@ -1,22 +1,20 @@
 #![feature(seek_stream_len)]
 
+mod audio;
 mod decode;
 mod encode;
-mod filter;
 mod parse;
 mod reader;
-mod resampling;
 mod result;
 mod scaler;
 mod types;
 
+pub use audio::{audio_buffer, AudioSpec, Resampler};
 pub use decode::{Decoder, Frame, FrameProcess};
 pub use encode::{EncodeParams, Encoder};
 pub use ffmpeg_next::format::Pixel as VideoPixel;
-pub use filter::audio_buffer;
 pub use parse::parse_video_group;
 pub use reader::{input_buffer, input_file, input_reader, output_file, read_attachment};
-pub use resampling::{AudioSpec, Resampler};
 pub use result::{FFmpegError, FFmpegResult};
 pub use scaler::Scaler;
 pub use types::{

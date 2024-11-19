@@ -262,7 +262,13 @@ mod tests {
         )
         .unwrap();
 
-        let mut buffer = audio_buffer(&decoder, &encoder).unwrap();
+        let target_spec = AudioSpec::new(
+            ChannelLayout::STEREO,
+            Sample::F32(SampleType::Planar),
+            48000,
+        );
+        let mut resampling = Resampler::new(&decoder, &target_spec).unwrap();
+        let mut buffer = audio_buffer(&target_spec, &encoder).unwrap();
 
         // output.set_metadata(input.metadata().to_owned());
         encoder.write_header().unwrap();
@@ -272,7 +278,12 @@ mod tests {
                 panic!("Unexpected frame type");
             };
 
-            buffer.get("in").unwrap().source().add(&frame).unwrap();
+            buffer
+                .get("in")
+                .unwrap()
+                .source()
+                .add(&resampling.resample(&frame).unwrap())
+                .unwrap();
 
             let mut filtered = AudioFrame::empty();
             let mut ctx = buffer.get("out").unwrap();

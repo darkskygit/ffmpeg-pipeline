@@ -5,24 +5,26 @@ use ffmpeg_next::{
 };
 
 /// auto re-sample and buffer the audio frame from the decoder to the encoder
-/// 
+///
 /// some encode, like opus support variable frame size, the frame decoded from other format
 /// may not be the same as the frame size of the encoder, this filter graph will handle the
 /// re-sample and frame split.
-pub fn audio_buffer(decoder: &Decoder, encoder: &Encoder) -> FFmpegResult<Graph> {
-    let (StreamDecoder::Audio(decoder), StreamEncoder::Audio(encoder)) =
-        (decoder.get_decoder(), encoder.get_encoder())
-    else {
-        return Err(FFmpegError::InvalidStreamType("Video".into()));
-    };
+pub fn audio_buffer<S, D>(src: S, dst: D) -> FFmpegResult<Graph>
+where
+    S: TryInto<AudioSpec, Error = FFmpegError>,
+    D: TryInto<AudioSpec, Error = FFmpegError>,
+{
+    let src: AudioSpec = src.try_into()?;
+    let dst: AudioSpec = dst.try_into()?;
+
     let mut filter = filter::Graph::new();
 
     let args = format!(
         "time_base={}:sample_rate={}:sample_fmt={}:channel_layout=0x{:x}",
-        decoder.time_base(),
-        decoder.rate(),
-        decoder.format().name(),
-        decoder.channel_layout().bits()
+        src.time_base,
+        src.sample_rate,
+        src.format.name(),
+        src.channel_layout.bits()
     );
 
     filter.add(&filter::find("abuffer").unwrap(), "in", &args)?;
@@ -31,9 +33,9 @@ pub fn audio_buffer(decoder: &Decoder, encoder: &Encoder) -> FFmpegResult<Graph>
     {
         let mut out = filter.get("out").unwrap();
 
-        out.set_sample_format(encoder.format());
-        out.set_channel_layout(encoder.channel_layout());
-        out.set_sample_rate(encoder.rate());
+        out.set_sample_format(dst.format);
+        out.set_channel_layout(dst.channel_layout);
+        out.set_sample_rate(dst.sample_rate);
     }
 
     filter.output("in", 0)?.input("out", 0)?.parse("anull")?;
@@ -41,7 +43,7 @@ pub fn audio_buffer(decoder: &Decoder, encoder: &Encoder) -> FFmpegResult<Graph>
 
     println!("{}", filter.dump());
 
-    if let Some(codec) = encoder.codec() {
+    if let Some(codec) = dst.codec {
         if !codec
             .capabilities()
             .contains(Capabilities::VARIABLE_FRAME_SIZE)
@@ -50,7 +52,7 @@ pub fn audio_buffer(decoder: &Decoder, encoder: &Encoder) -> FFmpegResult<Graph>
                 .get("out")
                 .unwrap()
                 .sink()
-                .set_frame_size(encoder.frame_size());
+                .set_frame_size(dst.frame_size);
         }
     }
 

@@ -262,9 +262,9 @@ mod tests {
         println!("buffer: {}", buffer.len());
 
         let mut input = input_buffer(buffer).unwrap();
-        let mut resampling = Resampler::new_from_stream(
+        let mut resampling = Resampler::new(
             &input.as_ref().stream(index).unwrap(),
-            AudioSpec::new(48000, Sample::I16(SampleType::Planar), ChannelLayout::MONO),
+            &AudioSpec::new(ChannelLayout::MONO, Sample::I16(SampleType::Planar), 48000),
         )
         .unwrap();
         let frames = Decoder::new_with_audio(input.as_mut(), index, FrameProcess::Decode).unwrap();
