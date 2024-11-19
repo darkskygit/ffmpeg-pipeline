@@ -3,83 +3,10 @@ use ffmpeg_next::{
     channel_layout::ChannelLayout,
     codec::{context::Context, Compliance, Flags as CodecFlags, Id},
     encoder,
+    ffi::av_opt_set_int,
     format::context::Output,
     Packet, Rational,
 };
-
-pub enum EncodeParams {
-    Audio {
-        bitrate: usize,
-        channel_layout: ChannelLayout,
-        global_header: bool,
-        rate: i32,
-        time_base: Rational,
-    },
-    Video {
-        time_base: Rational,
-        global_header: bool,
-    },
-}
-
-impl EncodeParams {
-    pub fn time_base(&self) -> Rational {
-        match self {
-            EncodeParams::Audio { time_base, .. } => *time_base,
-            EncodeParams::Video { time_base, .. } => *time_base,
-        }
-    }
-
-    pub fn with_bitrate(self, bitrate: usize) -> Self {
-        if let Self::Audio {
-            channel_layout,
-            global_header,
-            rate,
-            time_base,
-            ..
-        } = self
-        {
-            Self::Audio {
-                bitrate,
-                channel_layout,
-                global_header,
-                rate,
-                time_base,
-            }
-        } else {
-            self
-        }
-    }
-}
-
-impl Default for EncodeParams {
-    fn default() -> Self {
-        EncodeParams::Audio {
-            bitrate: 128 * 1024,
-            channel_layout: ChannelLayout::STEREO,
-            global_header: false,
-            rate: 44100,
-            time_base: Rational::new(1, 44100),
-        }
-    }
-}
-
-impl From<&Decoder<'_>> for EncodeParams {
-    fn from(decoder: &Decoder<'_>) -> Self {
-        match decoder.get_decoder() {
-            StreamDecoder::Audio(decoder) => EncodeParams::Audio {
-                bitrate: decoder.bit_rate(),
-                rate: decoder.rate() as i32,
-                channel_layout: decoder.channel_layout(),
-                time_base: decoder.time_base(),
-                global_header: false,
-            },
-            StreamDecoder::Video(decoder) => EncodeParams::Video {
-                time_base: decoder.time_base(),
-                global_header: false,
-            },
-        }
-    }
-}
 
 pub struct Encoder {
     index: usize,
@@ -103,6 +30,7 @@ impl Encoder {
                 global_header,
                 rate,
                 time_base,
+                vbr,
             } if codec.is_audio() => {
                 let codec = codec.audio()?;
                 let mut encoder = encoder.audio()?;
@@ -137,7 +65,21 @@ impl Encoder {
                 }
                 stream.set_time_base(time_base);
 
-                let encoder = encoder.open_as(codec).unwrap();
+                let mut encoder = encoder.open_as(codec).unwrap();
+                if vbr && encoder.id() == Id::OPUS {
+                    unsafe {
+                        match av_opt_set_int(
+                            (*encoder.as_mut_ptr()).priv_data,
+                            "vbr\0".as_ptr() as *const i8,
+                            2,
+                            0,
+                        ) {
+                            0 => Ok(()),
+                            e => Err(ffmpeg_next::Error::from(e)),
+                        }
+                    }?;
+                }
+
                 stream.set_parameters(&encoder);
                 StreamEncoder::Audio(encoder)
             }
@@ -234,60 +176,5 @@ impl Drop for Encoder {
         if let Err(e) = self.output.write_trailer() {
             error!("Error writing trailer: {}", e);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::read;
-
-    #[test]
-    fn test_encode_audio() {
-        ffmpeg_init();
-
-        let buffer = read(
-            r#"../../tests/assets/封緘のグラセスタ SOUND COLLECTION/2-12 Brightly horizon.m4a"#,
-        )
-        .unwrap();
-        let index = 0;
-
-        let mut input = input_buffer(buffer).unwrap();
-
-        let decoder = Decoder::new_with_audio(input.as_mut(), index, FrameProcess::Decode).unwrap();
-        let mut encoder = Encoder::new(
-            output_file("../../tests/tmp/test.opus").unwrap(),
-            Id::OPUS,
-            EncodeParams::from(&decoder).with_bitrate(64 * 1024),
-        )
-        .unwrap();
-        let mut buffer = audio_buffer(&decoder, &encoder).unwrap();
-
-        encoder.write_header().unwrap();
-
-        let mut buffer_out = buffer.get("out").unwrap();
-        let mut receive_buffered_frame = || {
-            let mut filtered = AudioFrame::empty();
-            while buffer_out.sink().frame(&mut filtered).is_ok() {
-                encoder.send_frame(&StreamFrame::Audio(filtered.clone()))?;
-                encoder.encode_frame()?;
-            }
-            Ok::<(), FFmpegError>(())
-        };
-
-        let mut buffer_in = buffer.get("in").unwrap();
-        let mut buffer_in_src = buffer_in.source();
-        for (idx, frame) in decoder.enumerate() {
-            let Frame::Frame(StreamFrame::Audio(frame)) = frame else {
-                panic!("Unexpected frame type");
-            };
-            buffer_in_src.add(&frame).unwrap();
-            receive_buffered_frame().unwrap();
-        }
-        buffer_in_src.flush().unwrap();
-        receive_buffered_frame().unwrap();
-
-        encoder.send_frame(&StreamFrame::Eof).unwrap();
-        encoder.encode_frame().unwrap();
     }
 }
