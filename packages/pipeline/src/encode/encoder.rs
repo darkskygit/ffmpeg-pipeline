@@ -1,6 +1,5 @@
 use super::*;
 use ffmpeg_next::{
-    channel_layout::ChannelLayout,
     codec::{context::Context, Compliance, Flags as CodecFlags, Id},
     encoder,
     ffi::av_opt_set_int,
