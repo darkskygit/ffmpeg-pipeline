@@ -1,10 +1,10 @@
-mod filter;
+mod auto_buffer;
 mod resampling;
 mod spec;
 
 use super::*;
 use std::convert::{TryFrom, TryInto};
 
-pub use filter::audio_buffer;
+pub use auto_buffer::AutoAudioBuffer;
 pub use resampling::Resampler;
 pub use spec::AudioSpec;

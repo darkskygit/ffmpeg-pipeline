@@ -3,21 +3,21 @@
 mod audio;
 mod decode;
 mod encode;
+mod io;
 mod parse;
-mod reader;
 mod result;
 mod scaler;
 mod types;
 
-pub use audio::{audio_buffer, AudioSpec, Resampler};
+pub use audio::{AudioSpec, AutoAudioBuffer, Resampler};
 pub use decode::{Decoder, Frame, FrameProcess};
 pub use encode::{EncodeParams, Encoder};
 pub use ffmpeg_next::format::Pixel as VideoPixel;
-pub use parse::parse_video_group;
-pub use reader::{
+pub use io::{
     input_buffer, input_file, input_reader, output_buffer, output_file, output_writer,
     read_attachment,
 };
+pub use parse::parse_video_group;
 pub use result::{FFmpegError, FFmpegResult};
 pub use scaler::Scaler;
 pub use types::{

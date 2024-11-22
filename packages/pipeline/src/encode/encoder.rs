@@ -129,7 +129,7 @@ impl<'o> Encoder<'o> {
         stream.set_metadata(metadata);
     }
 
-    pub fn write_header(&mut self) -> FFmpegResult<()> {
+    pub fn write_header(&mut self) -> FFmpegResult {
         Ok(self.output.write_header()?)
     }
 
@@ -140,7 +140,7 @@ impl<'o> Encoder<'o> {
         }
     }
 
-    pub fn send_frame(&mut self, frame: &StreamFrame) -> FFmpegResult<()> {
+    pub fn send_frame(&mut self, frame: &StreamFrame) -> FFmpegResult {
         match (&mut self.encoder, frame) {
             (StreamEncoder::Audio(ref mut encoder), StreamFrame::Audio(frame)) => {
                 encoder.send_frame(frame)?;
@@ -161,7 +161,7 @@ impl<'o> Encoder<'o> {
         Ok(())
     }
 
-    pub fn encode_frame(&mut self) -> FFmpegResult<()> {
+    pub fn encode_frame(&mut self) -> FFmpegResult {
         let mut encoded = Packet::empty();
 
         match self.encoder {

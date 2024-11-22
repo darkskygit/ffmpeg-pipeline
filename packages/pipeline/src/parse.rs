@@ -194,7 +194,7 @@ mod tests {
         });
     }
 
-    fn check_video_frame_count(file: &Path) -> FFmpegResult<()> {
+    fn check_video_frame_count(file: &Path) -> FFmpegResult {
         let info = parse_video_group(&file, FrameCalculation::Skip)?;
         debug!(
             "parse cost: {:?}",

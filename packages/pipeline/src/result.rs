@@ -34,4 +34,4 @@ impl PartialEq<FFmpegError> for FFmpegError {
     }
 }
 
-pub type FFmpegResult<T> = Result<T, FFmpegError>;
+pub type FFmpegResult<T = ()> = Result<T, FFmpegError>;

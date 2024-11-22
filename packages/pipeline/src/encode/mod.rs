@@ -35,32 +35,33 @@ mod tests {
                     .with_vbr(true),
             )
             .unwrap();
-            let mut buffer = audio_buffer(&decoder, &encoder).unwrap();
 
             encoder.set_metadata("encoder", "ffmpeg");
             encoder.write_header().unwrap();
 
-            let mut buffer_out = buffer.get("out").unwrap();
-            let mut receive_buffered_frame = || {
-                let mut filtered = AudioFrame::empty();
-                while buffer_out.sink().frame(&mut filtered).is_ok() {
-                    encoder.send_frame(&StreamFrame::Audio(filtered.clone()))?;
-                    encoder.encode_frame()?;
-                }
-                Ok::<(), FFmpegError>(())
-            };
+            let mut buffer = AutoAudioBuffer::new(&decoder, &encoder).unwrap();
 
-            let mut buffer_in = buffer.get("in").unwrap();
-            let mut buffer_in_src = buffer_in.source();
-            for (idx, frame) in decoder.enumerate() {
+            for frame in decoder {
                 let Frame::Frame(StreamFrame::Audio(frame)) = frame else {
                     panic!("Unexpected frame type");
                 };
-                buffer_in_src.add(&frame).unwrap();
-                receive_buffered_frame().unwrap();
+                buffer.add_frame(&frame).unwrap();
+                buffer
+                    .recv_frames(|frame| {
+                        encoder.send_frame(&StreamFrame::Audio(frame))?;
+                        encoder.encode_frame()?;
+                        Ok(())
+                    })
+                    .unwrap();
             }
-            buffer_in_src.flush().unwrap();
-            receive_buffered_frame().unwrap();
+            buffer.flush().unwrap();
+            buffer
+                .recv_frames(|frame| {
+                    encoder.send_frame(&StreamFrame::Audio(frame))?;
+                    encoder.encode_frame()?;
+                    Ok(())
+                })
+                .unwrap();
 
             encoder.send_frame(&StreamFrame::Eof).unwrap();
             encoder.encode_frame().unwrap();
