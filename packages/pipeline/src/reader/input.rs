@@ -8,9 +8,9 @@ pub struct BufferedInput {
     io_ctx: Box<*mut sys::AVIOContext>,
 }
 
-pub trait Readable: std::io::Read + std::io::Seek {}
+pub trait Readable: Read + Seek {}
 
-impl<T: std::io::Read + std::io::Seek> Readable for T {}
+impl<T: Read + Seek> Readable for T {}
 
 pub struct AVIOContextData {
     cursor: Box<dyn Readable>,

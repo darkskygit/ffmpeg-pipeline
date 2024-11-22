@@ -1,22 +1,37 @@
-mod buffer;
+mod input;
+mod output;
 
 use super::*;
-use buffer::{BufferedInput, Readable};
 use ffmpeg_next::{
     format::{input_with_dictionary, output_with},
     media, Dictionary,
 };
+use input::{BufferedInput, Readable};
+use output::{BufferedOutput, Writable};
 use std::{
-    io::{Cursor, Read, Seek},
+    io::{Cursor, Read, Seek, Write},
     path::Path,
 };
 
+#[inline(always)]
 pub fn input_buffer(data: Vec<u8>) -> FFmpegResult<BufferedInput> {
     input_reader(Cursor::new(data))
 }
 
 pub fn input_reader<R: Readable + 'static>(reader: R) -> FFmpegResult<BufferedInput> {
     BufferedInput::from_reader(reader)
+}
+
+#[inline(always)]
+pub fn output_buffer(format: &str) -> FFmpegResult<BufferedOutput> {
+    output_writer(Cursor::new(vec![]), format)
+}
+
+pub fn output_writer<W: Writable + 'static>(
+    writer: W,
+    format: &str,
+) -> FFmpegResult<BufferedOutput> {
+    BufferedOutput::from_writer(writer, format)
 }
 
 pub fn input_file<P: AsRef<Path>>(path: P) -> FFmpegResult<Input> {

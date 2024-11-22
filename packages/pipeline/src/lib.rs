@@ -1,4 +1,4 @@
-#![feature(seek_stream_len)]
+#![feature(seek_stream_len, trait_upcasting)]
 
 mod audio;
 mod decode;
@@ -14,7 +14,10 @@ pub use decode::{Decoder, Frame, FrameProcess};
 pub use encode::{EncodeParams, Encoder};
 pub use ffmpeg_next::format::Pixel as VideoPixel;
 pub use parse::parse_video_group;
-pub use reader::{input_buffer, input_file, input_reader, output_file, read_attachment};
+pub use reader::{
+    input_buffer, input_file, input_reader, output_buffer, output_file, output_writer,
+    read_attachment,
+};
 pub use result::{FFmpegError, FFmpegResult};
 pub use scaler::Scaler;
 pub use types::{

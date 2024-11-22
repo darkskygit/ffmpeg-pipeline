@@ -13,6 +13,8 @@ pub enum FFmpegError {
     StreamNotFound(usize),
     #[error("Codec not found: {0:?}")]
     CodecNotFound(Id),
+    #[error("Invalid format: {0}")]
+    InvalidFormat(String),
     #[error("Invalid frame type: {0}")]
     InvalidFrameType(String),
     #[error("Invalid stream type: {0}")]
