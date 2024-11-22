@@ -63,9 +63,9 @@ impl TryFrom<&Decoder<'_>> for AudioSpec {
     }
 }
 
-impl TryFrom<&Encoder> for AudioSpec {
+impl TryFrom<&Encoder<'_>> for AudioSpec {
     type Error = FFmpegError;
-    fn try_from(encoder: &Encoder) -> Result<Self, Self::Error> {
+    fn try_from(encoder: &Encoder<'_>) -> Result<Self, Self::Error> {
         match encoder.get_encoder() {
             StreamEncoder::Audio(encoder) => {
                 Ok(

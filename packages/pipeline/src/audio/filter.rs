@@ -41,8 +41,6 @@ where
     filter.output("in", 0)?.input("out", 0)?.parse("anull")?;
     filter.validate()?;
 
-    println!("{}", filter.dump());
-
     if let Some(codec) = dst.codec {
         if !codec
             .capabilities()

@@ -7,16 +7,20 @@ use ffmpeg_next::{
     Packet, Rational,
 };
 
-pub struct Encoder {
+pub struct Encoder<'o> {
     index: usize,
-    output: Output,
+    output: &'o mut Output,
     encoder: StreamEncoder,
     in_time_base: Rational,
     out_time_base: Rational,
 }
 
-impl Encoder {
-    pub fn new(mut output: Output, codec_id: Id, codec_params: EncodeParams) -> FFmpegResult<Self> {
+impl<'o> Encoder<'o> {
+    pub fn new(
+        output: &'o mut Output,
+        codec_id: Id,
+        codec_params: EncodeParams,
+    ) -> FFmpegResult<Self> {
         let codec = encoder::find(codec_id).ok_or(FFmpegError::CodecNotFound(codec_id))?;
         let mut stream = output.add_stream(codec.clone())?;
         let mut encoder = Context::from_parameters(stream.parameters())?.encoder();
@@ -177,7 +181,7 @@ impl Encoder {
     }
 }
 
-impl Drop for Encoder {
+impl Drop for Encoder<'_> {
     fn drop(&mut self) {
         if let Err(e) = self.output.write_trailer() {
             error!("Error writing trailer: {}", e);
