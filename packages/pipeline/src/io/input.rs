@@ -1,27 +1,21 @@
 use super::*;
 use ffmpeg_next::{format::context, sys, Error};
-use std::{ffi::c_void, io::SeekFrom, ptr::null_mut};
+use std::{
+    ffi::c_void,
+    ptr::{null, null_mut},
+};
 
 pub struct BufferedInput {
-    _ctx: Box<AVIOContextData>,
+    _ctx: Box<AVInputContextData>,
     input: Input,
     io_ctx: Box<*mut sys::AVIOContext>,
-}
-
-pub trait Readable: Read + Seek {}
-
-impl<T: Read + Seek> Readable for T {}
-
-pub struct AVIOContextData {
-    cursor: Box<dyn Readable>,
-    length: u64,
 }
 
 impl BufferedInput {
     pub fn from_reader(mut reader: impl Readable + 'static) -> FFmpegResult<Self> {
         let length = reader.stream_len()?;
         let cursor = Box::new(reader) as Box<dyn Readable>;
-        let ctx = Box::new(AVIOContextData { cursor, length });
+        let ctx = Box::new(AVInputContextData { cursor, length });
         let (io_ctx, input) = Self::input_buffer(ctx.as_ref())?;
         Ok(Self {
             _ctx: ctx,
@@ -30,26 +24,17 @@ impl BufferedInput {
         })
     }
 
-    fn input_buffer(ctx: &AVIOContextData) -> FFmpegResult<(Box<*mut sys::AVIOContext>, Input)> {
+    fn input_buffer(ctx: &AVInputContextData) -> FFmpegResult<(Box<*mut sys::AVIOContext>, Input)> {
         let mut options = Dictionary::new();
         options.set("max_streams", "8192");
 
         unsafe {
-            let avio_ctx = sys::avio_alloc_context(
-                sys::av_malloc(4096) as *mut u8,
-                4096,
-                0,
-                ctx as *const _ as *mut _,
-                Some(Self::read),
-                None,
-                Some(Self::seek),
-            );
-
+            let avio_ctx = get_avio_context(false, ctx as *const _ as *mut _);
             let mut ps = sys::avformat_alloc_context();
             (*ps).pb = avio_ctx;
 
             let mut opts = options.disown();
-            let res = sys::avformat_open_input(&mut ps, null_mut(), null_mut(), &mut opts);
+            let res = sys::avformat_open_input(&mut ps, null(), null(), &mut opts);
 
             Dictionary::own(opts);
 
@@ -67,49 +52,6 @@ impl BufferedInput {
         }
         .map_err(|e| e.into())
     }
-
-    unsafe extern "C" fn read(
-        opaque: *mut std::os::raw::c_void,
-        buf: *mut u8,
-        buf_size: i32,
-    ) -> i32 {
-        let ctx = &mut *(opaque as *mut AVIOContextData);
-        let slice = std::slice::from_raw_parts_mut(buf, buf_size as usize);
-        match ctx.cursor.read(slice) {
-            Ok(size) => (size != 0)
-                .then_some(size as i32)
-                .unwrap_or(sys::AVERROR_EOF),
-            Err(_) => -1,
-        }
-    }
-
-    unsafe extern "C" fn seek(opaque: *mut std::os::raw::c_void, offset: i64, whence: i32) -> i64 {
-        let ctx = &mut *(opaque as *mut AVIOContextData);
-        match whence {
-            sys::AVSEEK_SIZE => ctx.length as i64,
-            _ => {
-                let pos = match whence {
-                    sys::SEEK_SET => SeekFrom::Start(offset as u64),
-                    sys::SEEK_CUR => SeekFrom::Current(offset),
-                    sys::SEEK_END => SeekFrom::End(offset),
-                    _ => return -1,
-                };
-
-                match ctx.cursor.seek(pos) {
-                    Ok(pos) => pos as i64,
-                    Err(_e) => -1,
-                }
-            }
-        }
-    }
-
-    pub fn as_ref(&self) -> &Input {
-        &self.input
-    }
-
-    pub fn as_mut(&mut self) -> &mut Input {
-        &mut self.input
-    }
 }
 
 impl Drop for BufferedInput {
@@ -117,6 +59,18 @@ impl Drop for BufferedInput {
         unsafe {
             sys::av_free((*self.io_ctx) as *mut c_void);
         }
+    }
+}
+
+impl AsRef<Input> for BufferedInput {
+    fn as_ref(&self) -> &Input {
+        &self.input
+    }
+}
+
+impl AsMut<Input> for BufferedInput {
+    fn as_mut(&mut self) -> &mut Input {
+        &mut self.input
     }
 }
 

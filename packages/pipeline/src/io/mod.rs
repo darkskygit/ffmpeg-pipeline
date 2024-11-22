@@ -1,17 +1,16 @@
 mod input;
 mod output;
+mod utils;
 
 use super::*;
 use ffmpeg_next::{
     format::{input_with_dictionary, output_with},
     media, Dictionary,
 };
-use input::{BufferedInput, Readable};
-use output::{BufferedOutput, Writable};
-use std::{
-    io::{Cursor, Read, Seek, Write},
-    path::Path,
-};
+use input::BufferedInput;
+use output::BufferedOutput;
+use std::{io::Cursor, path::Path};
+use utils::{get_avio_context, AVInputContextData, AVOutputContextData, Readable, Writable};
 
 #[inline(always)]
 pub fn input_buffer(data: Vec<u8>) -> FFmpegResult<BufferedInput> {
