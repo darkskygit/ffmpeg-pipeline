@@ -30,6 +30,7 @@ impl<'o> Encoder<'o> {
             EncodeParams::Audio {
                 bitrate,
                 channel_layout,
+                compression,
                 global_header,
                 rate,
                 time_base,
@@ -54,6 +55,7 @@ impl<'o> Encoder<'o> {
                     .unwrap_or(rate);
                 encoder.set_bit_rate(bitrate);
                 encoder.set_channel_layout(channel_layout);
+                encoder.set_compression(compression);
                 encoder.set_format(
                     codec
                         .formats()
@@ -122,11 +124,15 @@ impl<'o> Encoder<'o> {
         &self.encoder
     }
 
-    pub fn set_metadata(&mut self, key: &str, value: &str) {
-        let mut stream = self.output.stream_mut(self.index).unwrap();
+    pub fn set_metadata(&mut self, key: &str, value: &str) -> FFmpegResult {
+        let mut stream = self
+            .output
+            .stream_mut(self.index)
+            .ok_or(FFmpegError::StreamNotFound(self.index))?;
         let mut metadata = stream.metadata().to_owned();
         metadata.set(key, value);
         stream.set_metadata(metadata);
+        Ok(())
     }
 
     pub fn write_header(&mut self) -> FFmpegResult {

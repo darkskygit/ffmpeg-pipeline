@@ -5,6 +5,7 @@ pub enum EncodeParams {
     Audio {
         bitrate: usize,
         channel_layout: ChannelLayout,
+        compression: Option<usize>,
         global_header: bool,
         rate: i32,
         time_base: Rational,
@@ -27,6 +28,7 @@ impl EncodeParams {
     pub fn with_bitrate(self, bitrate: usize) -> Self {
         if let Self::Audio {
             channel_layout,
+            compression,
             global_header,
             rate,
             time_base,
@@ -37,6 +39,32 @@ impl EncodeParams {
             Self::Audio {
                 bitrate,
                 channel_layout,
+                compression,
+                global_header,
+                rate,
+                time_base,
+                vbr,
+            }
+        } else {
+            self
+        }
+    }
+
+    pub fn with_compression(self, compression: Option<usize>) -> Self {
+        if let Self::Audio {
+            bitrate,
+            channel_layout,
+            global_header,
+            rate,
+            time_base,
+            vbr,
+            ..
+        } = self
+        {
+            Self::Audio {
+                bitrate,
+                channel_layout,
+                compression,
                 global_header,
                 rate,
                 time_base,
@@ -51,6 +79,7 @@ impl EncodeParams {
         if let Self::Audio {
             bitrate,
             channel_layout,
+            compression,
             global_header,
             rate,
             time_base,
@@ -60,6 +89,7 @@ impl EncodeParams {
             Self::Audio {
                 bitrate,
                 channel_layout,
+                compression,
                 global_header,
                 rate,
                 time_base,
@@ -76,6 +106,7 @@ impl Default for EncodeParams {
         EncodeParams::Audio {
             bitrate: 128 * 1024,
             channel_layout: ChannelLayout::STEREO,
+            compression: None,
             global_header: false,
             rate: 44100,
             time_base: Rational::new(1, 44100),
@@ -91,6 +122,7 @@ impl From<&Decoder<'_>> for EncodeParams {
                 bitrate: decoder.bit_rate(),
                 rate: decoder.rate() as i32,
                 channel_layout: decoder.channel_layout(),
+                compression: None,
                 time_base: decoder.time_base(),
                 global_header: false,
                 vbr: false,
