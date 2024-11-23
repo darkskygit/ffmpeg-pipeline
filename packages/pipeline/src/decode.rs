@@ -53,14 +53,14 @@ impl<'i> Decoder<'i> {
     }
 
     pub fn new_with_audio(
-        handler: &'i mut Input,
+        input: &'i mut Input,
         index: usize,
         process: FrameProcess,
     ) -> FFmpegResult<Self> {
-        if let Some(stream) = handler.stream(index) {
+        if let Some(stream) = input.stream(index) {
             let codec = Context::from_parameters(stream.parameters())?;
             let decoder = StreamDecoder::Audio(codec.decoder().audio()?);
-            let packets = handler.packets();
+            let packets = input.packets();
 
             Ok(Self {
                 index,

@@ -52,7 +52,9 @@ impl BufferedOutput {
         .map_err(|e| e.into())
     }
 
-    pub fn into_inner<T: Writable>(mut self) -> Result<T, ()> {
+    pub fn into_inner<T: Writable>(mut self) -> FFmpegResult<T> {
+        use std::io::{Error, ErrorKind};
+
         unsafe {
             sys::av_free((*self.io_ctx) as *mut c_void);
             (*self.output.as_mut_ptr()).pb = null_mut();
@@ -62,7 +64,10 @@ impl BufferedOutput {
         if let Ok(cursor) = cursor.downcast::<T>() {
             Ok(*cursor)
         } else {
-            Err(())
+            Err(FFmpegError::Io(Error::new(
+                ErrorKind::InvalidData,
+                "invalid cursor type",
+            )))
         }
     }
 }

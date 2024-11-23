@@ -78,7 +78,7 @@ impl AutoAudioBuffer {
         Ok(())
     }
 
-    pub fn recv_frames<F>(&mut self, mut cb: F) -> FFmpegResult
+    pub fn recv_frames<F>(&mut self, cb: &mut F) -> FFmpegResult
     where
         F: FnMut(AudioFrame) -> FFmpegResult,
     {

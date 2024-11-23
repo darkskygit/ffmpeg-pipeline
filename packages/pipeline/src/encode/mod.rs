@@ -4,6 +4,7 @@ mod params;
 use super::*;
 
 pub use encoder::Encoder;
+pub use ffmpeg_next::codec::Id as CodecId;
 pub use params::EncodeParams;
 
 #[cfg(test)]
@@ -40,28 +41,21 @@ mod tests {
             encoder.write_header().unwrap();
 
             let mut buffer = AutoAudioBuffer::new(&decoder, &encoder).unwrap();
+            let mut encode_cb = |frame: AudioFrame| -> FFmpegResult<()> {
+                encoder.send_frame(&StreamFrame::Audio(frame))?;
+                encoder.encode_frame()?;
+                Ok(())
+            };
 
             for frame in decoder {
                 let Frame::Frame(StreamFrame::Audio(frame)) = frame else {
                     panic!("Unexpected frame type");
                 };
                 buffer.add_frame(&frame).unwrap();
-                buffer
-                    .recv_frames(|frame| {
-                        encoder.send_frame(&StreamFrame::Audio(frame))?;
-                        encoder.encode_frame()?;
-                        Ok(())
-                    })
-                    .unwrap();
+                buffer.recv_frames(&mut encode_cb).unwrap();
             }
             buffer.flush().unwrap();
-            buffer
-                .recv_frames(|frame| {
-                    encoder.send_frame(&StreamFrame::Audio(frame))?;
-                    encoder.encode_frame()?;
-                    Ok(())
-                })
-                .unwrap();
+            buffer.recv_frames(&mut encode_cb).unwrap();
 
             encoder.send_frame(&StreamFrame::Eof).unwrap();
             encoder.encode_frame().unwrap();
