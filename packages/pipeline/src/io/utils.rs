@@ -17,11 +17,13 @@ pub trait Writable: Seek + Write + Any {}
 
 impl<T: Seek + Write + Any> Writable for T {}
 
+#[repr(C)]
 pub struct AVInputContextData {
     pub(super) cursor: Box<dyn Readable>,
     pub(super) length: u64,
 }
 
+#[repr(C)]
 pub struct AVOutputContextData {
     pub(super) cursor: Box<dyn Writable>,
 }
@@ -37,7 +39,7 @@ unsafe extern "C" fn read(opaque: *mut c_void, buf: *mut u8, buf_size: i32) -> i
 }
 
 #[inline]
-unsafe extern "C" fn write(opaque: *mut c_void, buf: *mut u8, buf_size: i32) -> i32 {
+unsafe extern "C" fn write(opaque: *mut c_void, buf: *const u8, buf_size: i32) -> i32 {
     let ctx = &mut *(opaque as *mut AVOutputContextData);
     let slice = from_raw_parts(buf, buf_size as usize);
     match ctx.cursor.write(slice) {
