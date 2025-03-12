@@ -257,7 +257,7 @@ mod tests {
     fn test_audio_frame_iterator() {
         ffmpeg_init();
 
-        let buffer = read(r#"../../tests/assets/中恵光城-Brightly horizon.m4a"#).unwrap();
+        let buffer = read("../../tests/assets/test.m4a").unwrap();
         let index = 0;
         println!("buffer: {}", buffer.len());
 

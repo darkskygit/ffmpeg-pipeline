@@ -81,7 +81,7 @@ mod tests {
 
     #[test]
     fn test_buffered_input() {
-        let path = Path::new("../../tests/assets/中恵光城-Brightly horizon.m4a");
+        let path = Path::new("../../tests/assets/test.m4a");
         let mut file = File::open(path).unwrap();
         let mut data = Vec::new();
         file.read_to_end(&mut data).unwrap();

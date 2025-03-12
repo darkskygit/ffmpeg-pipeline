@@ -3,7 +3,6 @@ use ffmpeg_next::{format::context, sys, Error};
 use std::{
     any::Any,
     ffi::{c_void, CString},
-    io::SeekFrom,
     ptr::null_mut,
 };
 

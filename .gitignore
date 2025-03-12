@@ -1,2 +1,5 @@
 /target
 tests/assets
+tmp
+.DS_Store
+*.log

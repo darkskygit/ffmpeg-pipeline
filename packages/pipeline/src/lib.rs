@@ -11,8 +11,7 @@ mod types;
 
 pub use audio::{AudioSpec, AutoAudioBuffer, Resampler};
 pub use decode::{Decoder, Frame, FrameProcess};
-pub use encode::{CodecId, EncodeParams, Encoder};
-pub use ffmpeg_next::format::Pixel as VideoPixel;
+pub use encode::{EncodeParams, Encoder};
 pub use io::{
     input_buffer, input_file, input_reader, output_buffer, output_file, output_writer,
     read_attachment,
@@ -21,8 +20,8 @@ pub use parse::parse_video_group;
 pub use result::{FFmpegError, FFmpegResult};
 pub use scaler::Scaler;
 pub use types::{
-    AudioFrame, ChannelLayout, Input, Output, Sample, SampleType, Stream, StreamDecoder,
-    StreamEncoder, StreamFrame, VideoFrame,
+    AudioFrame, ChannelLayout, CodecId, Input, Output, Sample, SampleType, Stream, StreamDecoder,
+    StreamEncoder, StreamFrame, VideoFrame, VideoPixel,
 };
 
 use ffmpeg_next::{

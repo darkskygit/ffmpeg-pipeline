@@ -9,12 +9,13 @@ use log::warn;
 use serde::{Deserialize, Serialize};
 
 pub use ffmpeg_next::{
+    codec::Id as CodecId,
     decoder::{Audio as AudioDecoder, Video as VideoDecoder},
     encoder::{Audio as AudioEncoder, Video as VideoEncoder},
     format::{
         context::{Input, Output},
         sample::Type as SampleType,
-        Sample,
+        Pixel as VideoPixel, Sample,
     },
     util::frame::{audio::Audio as AudioFrame, video::Video as VideoFrame},
     ChannelLayout, Stream,

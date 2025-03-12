@@ -4,7 +4,6 @@ mod params;
 use super::*;
 
 pub use encoder::Encoder;
-pub use ffmpeg_next::codec::Id as CodecId;
 pub use params::EncodeParams;
 
 #[cfg(test)]
@@ -20,7 +19,7 @@ mod tests {
     fn test_encode_audio() {
         ffmpeg_init();
 
-        let buffer = read(r#"../../tests/assets/1.m4a"#).unwrap();
+        let buffer = read("../../tests/assets/test.m4a").unwrap();
         let index = 0;
 
         let mut input = input_buffer(buffer).unwrap();
@@ -37,7 +36,7 @@ mod tests {
             )
             .unwrap();
 
-            encoder.set_metadata("encoder", "ffmpeg");
+            encoder.set_metadata("encoder", "ffmpeg").unwrap();
             encoder.write_header().unwrap();
 
             let mut buffer = AutoAudioBuffer::new(&decoder, &encoder).unwrap();
@@ -62,6 +61,6 @@ mod tests {
         }
 
         let buffer = output.into_inner::<Cursor<Vec<_>>>().unwrap();
-        write("./tmp/1.opus", buffer.into_inner()).unwrap();
+        write("../../tests/tmp/test.opus", buffer.into_inner()).unwrap();
     }
 }
