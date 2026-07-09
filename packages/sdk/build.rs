@@ -6,7 +6,7 @@ use ffmpeg_sdk_builder::is_valid_sdk;
 use ffmpeg_sdk_builder::ensure_prebuilt_sdk;
 
 #[cfg(feature = "build-from-source")]
-use ffmpeg_sdk_builder::{AudioCodec, Component, FFmpegBuilder, MuxerFormat, VideoCodec};
+use ffmpeg_sdk_builder::pipeline_sdk_builder;
 
 #[cfg(not(feature = "build-from-source"))]
 const DEFAULT_SDK_TAG: &str = "sdk-v7.1.5";
@@ -43,27 +43,7 @@ fn main() -> io::Result<()> {
 #[cfg(feature = "build-from-source")]
 fn build_from_source() -> io::Result<()> {
     let output_dir = PathBuf::from(required_env("OUT_DIR")?);
-    let output = FFmpegBuilder::new()
-        .source_dir(output_dir.join("sources"))
-        .build_dir(&output_dir)
-        .with_component(Component::AOM)
-        .with_component(Component::Opus)
-        .with_component(Component::ZLib)
-        .with_video_codecs([VideoCodec::H264, VideoCodec::HEVC, VideoCodec::AV1])
-        .with_audio_codecs([
-            AudioCodec::Opus,
-            AudioCodec::AAC,
-            AudioCodec::MP3,
-            AudioCodec::FLAC,
-        ])
-        .with_muxer_formats([
-            MuxerFormat::Matroska,
-            MuxerFormat::MP4,
-            MuxerFormat::Ogg,
-            MuxerFormat::MOV,
-        ])
-        .enable_hwaccel(false)
-        .use_cache(true)
+    let output = pipeline_sdk_builder(output_dir.join("sources"), &output_dir)
         .verbose(true)
         .build()
         .compile()?;

@@ -11,6 +11,8 @@ mod error;
 mod platform; // 提供平台检测
 mod prebuilt;
 #[cfg(feature = "build-from-source")]
+mod preset;
+#[cfg(feature = "build-from-source")]
 mod types;
 #[cfg_attr(not(feature = "build-from-source"), allow(dead_code))]
 mod utils;
@@ -20,6 +22,8 @@ pub use builder::FFmpegBuilder;
 #[cfg(feature = "build-from-source")]
 pub use error::FFmpegError;
 pub use prebuilt::{ensure_prebuilt_sdk, is_valid_sdk};
+#[cfg(feature = "build-from-source")]
+pub use preset::pipeline_sdk_builder;
 #[cfg(feature = "build-from-source")]
 pub use types::{AudioCodec, Component, MuxerFormat, VideoCodec};
 

@@ -2,14 +2,12 @@
 
 #[cfg(not(target_os = "windows"))]
 use cmake::Config;
-#[cfg(target_os = "windows")]
-use std::fs;
 use std::io::Result;
 use std::path::{Path, PathBuf};
 
 use crate::utils;
 
-const AOM_COMMIT: &str = "412efe2dacf00de33fa32633dff4cf53d3d05b4f";
+const AOM_VERSION: &str = "3.12.1";
 
 pub struct AomBuilder<'a> {
     source_dir: &'a PathBuf,
@@ -41,14 +39,6 @@ impl<'a> AomBuilder<'a> {
         self.output_dir.join("_build").join("aom")
     }
 
-    fn checkout_commit(&self) -> Option<&'static str> {
-        if cfg!(target_os = "macos") {
-            None
-        } else {
-            Some(AOM_COMMIT)
-        }
-    }
-
     fn build_aom_common(&self) -> Result<()> {
         utils::log_info("Compiling AOM (libaom)...", self.verbose);
 
@@ -57,8 +47,8 @@ impl<'a> AomBuilder<'a> {
             utils::clone_repository(
                 "https://aomedia.googlesource.com/aom",
                 &aom_dir,
+                Some(&format!("v{AOM_VERSION}")),
                 None,
-                self.checkout_commit(),
                 self.verbose,
             )?;
         }
@@ -79,48 +69,9 @@ impl<'a> AomBuilder<'a> {
             .define("ENABLE_TESTDATA", "OFF")
             .define("ENABLE_TOOLS", "OFF")
             .define("ENABLE_NASM", "ON")
+            .define("CONFIG_AV1_ENCODER", "0")
             .out_dir(aom_build_dir);
         config
-    }
-
-    #[cfg(target_os = "windows")]
-    fn install_windows_artifacts(&self, aom_dir: &Path, aom_build_dir: &Path) -> Result<()> {
-        let include_dir = self.output_dir.join("include");
-        let lib_dir = self.output_dir.join("lib");
-        let pkgconfig_dir = lib_dir.join("pkgconfig");
-        utils::mkdir(&include_dir)?;
-        utils::mkdir(&lib_dir)?;
-        utils::mkdir(&pkgconfig_dir)?;
-
-        for header_dir in [
-            "aom",
-            "aom_dsp",
-            "aom_mem",
-            "aom_ports",
-            "aom_scale",
-            "aom_util",
-        ] {
-            let source = aom_dir.join(header_dir);
-            if source.exists() {
-                copy_dir_all(&source, &include_dir.join(header_dir))?;
-            }
-        }
-        copy_dir_all(&aom_build_dir.join("config"), &include_dir.join("config"))?;
-
-        fs::copy(
-            aom_build_dir.join("RelWithDebInfo").join("aom.lib"),
-            lib_dir.join("aom.lib"),
-        )?;
-
-        fs::write(
-            pkgconfig_dir.join("aom.pc"),
-            format!(
-                "prefix={0}\nexec_prefix=${{prefix}}\nlibdir=${{exec_prefix}}/lib\nincludedir=${{prefix}}/include\n\nName: aom\nDescription: Alliance for Open Media AV1 codec library\nVersion: 3.12.0\nLibs: -L${{libdir}} -laom\nCflags: -I${{includedir}}\n",
-                self.output_dir.display()
-            ),
-        )?;
-
-        Ok(())
     }
 
     #[cfg(target_os = "macos")]
@@ -160,9 +111,6 @@ impl<'a> AomBuilder<'a> {
         let aom_build_dir = self.build_dir().join("build");
         utils::prepare_cmake_build(self.output_dir, &aom_build_dir, self.job_count)?;
 
-        // The Windows-pinned AOM commit does not generate INSTALL.vcxproj even with the
-        // Visual Studio generator, so we cannot rely on cmake --build --target install here.
-        // Configure/build can still be driven by CMake, then we stage headers/libs manually.
         utils::run_windows_cmake_install(
             &aom_dir,
             &aom_build_dir,
@@ -175,33 +123,16 @@ impl<'a> AomBuilder<'a> {
                 "-DENABLE_TESTDATA=OFF".to_string(),
                 "-DENABLE_TOOLS=OFF".to_string(),
                 "-DENABLE_NASM=on".to_string(),
+                "-DCONFIG_AV1_ENCODER=0".to_string(),
                 "-DCMAKE_C_FLAGS_RELEASE=/MT /GL".to_string(),
                 "-DCMAKE_CXX_FLAGS_RELEASE=/MT /GL".to_string(),
                 "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>".to_string(),
             ],
-            "RelWithDebInfo",
+            "Release",
             self.job_count,
             "AOM",
         )?;
-        self.install_windows_artifacts(&aom_dir, &aom_build_dir)?;
-
         utils::log_success("AOM build finished", self.verbose);
         Ok(())
     }
-}
-
-#[cfg(target_os = "windows")]
-fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
-    fs::create_dir_all(dst)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let source = entry.path();
-        let destination = dst.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            copy_dir_all(&source, &destination)?;
-        } else {
-            fs::copy(source, destination)?;
-        }
-    }
-    Ok(())
 }

@@ -65,7 +65,7 @@ pub fn handle_command_output(output: Result<Output>, step: &str) -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-pub fn run_windows_cmake_install(
+pub fn run_windows_cmake_build(
     source_dir: &Path,
     build_dir: &Path,
     output_dir: &Path,
@@ -103,6 +103,29 @@ pub fn run_windows_cmake_install(
         ])
         .output()?;
     handle_command_output(Ok(build_output), &format!("Build {}", step_name))?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+pub fn run_windows_cmake_install(
+    source_dir: &Path,
+    build_dir: &Path,
+    output_dir: &Path,
+    definitions: &[String],
+    config_name: &str,
+    job_count: usize,
+    step_name: &str,
+) -> Result<()> {
+    run_windows_cmake_build(
+        source_dir,
+        build_dir,
+        output_dir,
+        definitions,
+        config_name,
+        job_count,
+        step_name,
+    )?;
 
     let install_output = Command::new("cmake")
         .args([

@@ -62,7 +62,7 @@ impl<'a> FFmpegBuilder<'a> {
 
     /// 获取所有平台通用的 FFmpeg 克隆过程
     fn prepare_ffmpeg_source(&self) -> Result<PathBuf> {
-        let branch = "release/7.1";
+        let branch = "n7.1.5";
         let ffmpeg_dir = self.source_dir.join("ffmpeg");
 
         if !ffmpeg_dir.exists() {
@@ -201,6 +201,20 @@ impl<'a> FFmpegBuilder<'a> {
             "--disable-everything".to_string(),
             "--disable-programs".to_string(),
             "--disable-doc".to_string(),
+            "--disable-network".to_string(),
+            "--disable-autodetect".to_string(),
+            "--disable-shared".to_string(),
+            "--enable-static".to_string(),
+            "--enable-pic".to_string(),
+            "--pkg-config-flags=--static".to_string(),
+            format!(
+                "--extra-cflags=-I{}",
+                self.output_dir.join("include").display()
+            ),
+            format!(
+                "--extra-ldflags=-L{}",
+                self.output_dir.join("lib").display()
+            ),
             "--enable-gpl".to_string(),
         ];
 
@@ -281,6 +295,10 @@ impl<'a> FFmpegBuilder<'a> {
         // 执行配置命令
         let configure_output = Command::new("./configure")
             .current_dir(&ffmpeg_dir)
+            .env(
+                "PKG_CONFIG_PATH",
+                self.output_dir.join("lib").join("pkgconfig"),
+            )
             .args(&configure_args)
             .output()?;
         utils::handle_command_output(Ok(configure_output), "配置 FFmpeg")?;
@@ -315,6 +333,20 @@ impl<'a> FFmpegBuilder<'a> {
             "--disable-everything".to_string(),
             "--disable-programs".to_string(),
             "--disable-doc".to_string(),
+            "--disable-network".to_string(),
+            "--disable-autodetect".to_string(),
+            "--disable-shared".to_string(),
+            "--enable-static".to_string(),
+            "--enable-pic".to_string(),
+            "--pkg-config-flags=--static".to_string(),
+            format!(
+                "--extra-cflags=-I{}",
+                self.output_dir.join("include").display()
+            ),
+            format!(
+                "--extra-ldflags=-L{}",
+                self.output_dir.join("lib").display()
+            ),
             "--enable-gpl".to_string(),
         ];
 
@@ -383,6 +415,10 @@ impl<'a> FFmpegBuilder<'a> {
         // 执行配置命令
         let configure_output = Command::new("./configure")
             .current_dir(&ffmpeg_dir)
+            .env(
+                "PKG_CONFIG_PATH",
+                self.output_dir.join("lib").join("pkgconfig"),
+            )
             .args(&configure_args)
             .output()?;
         utils::handle_command_output(Ok(configure_output), "配置 FFmpeg")?;
@@ -430,6 +466,12 @@ impl<'a> FFmpegBuilder<'a> {
         configure_options.push_str("--disable-everything ");
         configure_options.push_str("--disable-programs ");
         configure_options.push_str("--disable-doc ");
+        configure_options.push_str("--disable-network ");
+        configure_options.push_str("--disable-autodetect ");
+        configure_options.push_str("--disable-shared ");
+        configure_options.push_str("--enable-static ");
+        configure_options.push_str("--enable-pic ");
+        configure_options.push_str("--pkg-config-flags=--static ");
         configure_options.push_str("--enable-gpl ");
 
         // 添加组件配置
@@ -513,7 +555,6 @@ impl<'a> FFmpegBuilder<'a> {
 #!/bin/bash
 set -e
 export PKG_CONFIG_PATH="{}:$PKG_CONFIG_PATH"
-pacman -S pkg-config yasm diffutils --noconfirm
 mkdir -p "{}"
 cd "{}"
 ./configure {}
@@ -533,7 +574,6 @@ make install
         // 创建执行 MSYS2 的批处理文件
         let msys_cmd = r#"
 @echo off
-call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
 set MSYS2_PATH_TYPE=inherit
 C:\msys64\msys2_shell.cmd -defterm -here -no-start -ucrt64 -c "chmod +x build_ffmpeg.sh && ./build_ffmpeg.sh"
 "#;

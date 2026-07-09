@@ -88,7 +88,7 @@ impl<'a> ZlibBuilder<'a> {
                 "-DCMAKE_CXX_FLAGS_RELEASE=/MT /GL".to_string(),
                 "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>".to_string(),
             ],
-            "RelWithDebInfo",
+            "Release",
             self.job_count,
             "zlib",
         )?;
@@ -98,6 +98,10 @@ impl<'a> ZlibBuilder<'a> {
         let installed_zlibstatic_lib = installed_lib_dir.join("zlibstatic.lib");
         if !installed_zlib_lib.exists() && installed_zlibstatic_lib.exists() {
             fs::copy(&installed_zlibstatic_lib, &installed_zlib_lib)?;
+        }
+        let ffmpeg_zlib = installed_lib_dir.join("z.lib");
+        if !ffmpeg_zlib.exists() && installed_zlibstatic_lib.exists() {
+            fs::copy(&installed_zlibstatic_lib, ffmpeg_zlib)?;
         }
 
         utils::log_success(

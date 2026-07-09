@@ -116,7 +116,7 @@ impl<'a> OpusBuilder<'a> {
                 "-DCMAKE_CXX_FLAGS_RELEASE=/MT /GL".to_string(),
                 "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>".to_string(),
             ],
-            "RelWithDebInfo",
+            "Release",
             self.job_count,
             "Opus",
         )?;

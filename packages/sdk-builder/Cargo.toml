@@ -26,3 +26,8 @@ sha2 = "0.10"
 tar = "0.4"
 tempfile = "3"
 thiserror = "1.0.69"
+
+[[bin]]
+name = "build-ffmpeg-sdk"
+path = "src/bin/build-ffmpeg-sdk.rs"
+required-features = ["build-from-source"]

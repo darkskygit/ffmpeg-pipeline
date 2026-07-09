@@ -44,12 +44,7 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install nasm pkg-config
       - name: Build SDK
-        if: runner.os == 'macOS'
-        run: scripts/build-ffmpeg-sdk.sh
-      - name: Build SDK
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: scripts/build-ffmpeg-sdk.sh
+        run: cargo run --release -p ffmpeg-sdk-builder --features build-from-source --bin build-ffmpeg-sdk -- --output ffmpeg-sdk
       - name: Validate Rust bindings
         shell: bash
         env:
