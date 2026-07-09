@@ -104,7 +104,7 @@ impl Iterator for Decoder<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         let next_frame = loop {
             if let Some((stream, packet)) = self.packets.next() {
-                if stream.index() != self.index as usize {
+                if stream.index() != self.index {
                     continue;
                 }
                 match self.process {
@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_video_frame_iterator() {
-        ffmpeg_init();
+        initialize(log::Level::Error).unwrap();
 
         let path = Path::new("../../tests/assets/test.mkv");
         let index = 5;
@@ -214,7 +214,7 @@ mod tests {
         });
 
         let handler = thread::spawn(move || {
-            let mut scaler = Scaler::from_path(&path, index, VideoPixel::RGB24).unwrap();
+            let mut scaler = Scaler::from_path(path, index, VideoPixel::RGB24).unwrap();
 
             for (idx, frame) in rx1
                 .iter()
@@ -255,7 +255,7 @@ mod tests {
 
     #[test]
     fn test_audio_frame_iterator() {
-        ffmpeg_init();
+        initialize(log::Level::Error).unwrap();
 
         let buffer = read("../../tests/assets/test.m4a").unwrap();
         let index = 0;

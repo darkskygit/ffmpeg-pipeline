@@ -69,15 +69,14 @@ pub fn parse_stream_info(stream: &Stream) -> FFmpegResult<VideoInfo> {
 pub fn parse_video_group(path: &Path, frame_calc: FrameCalculation) -> FFmpegResult<VideoGroups> {
     let mut groups = VideoGroups::default();
 
-    for stream in input_file(&path)?.streams() {
+    for stream in input_file(path)?.streams() {
         let mut info = parse_stream_info(&stream)?;
 
         if info.stream_type == "Video" {
             let ts = Instant::now();
 
             if !matches!(frame_calc, FrameCalculation::Skip) {
-                info.frames =
-                    parse_video_stream_frame_count(&path, info.stream, frame_calc.clone())?;
+                info.frames = parse_video_stream_frame_count(path, info.stream, frame_calc)?;
             }
 
             if cfg!(not(debug_assertions)) {
@@ -113,7 +112,7 @@ pub fn parse_video_stream_frame_count(
         }
     };
 
-    let mut handler = input_file(&path)?;
+    let mut handler = input_file(path)?;
     if let Some(stream) = handler.stream(stream_index as usize) {
         let codec = Context::from_parameters(stream.parameters())?;
         let mut video = codec.decoder().video()?;
@@ -165,21 +164,21 @@ mod tests {
     }
 
     fn diff_video_groups(file: &Path) -> FFmpegResult<()> {
-        let info = parse_video_group(&file, FrameCalculation::Fast)?;
-        let info1 = parse_video_group(&file, FrameCalculation::Full)?;
+        let info = parse_video_group(file, FrameCalculation::Fast)?;
+        let info1 = parse_video_group(file, FrameCalculation::Full)?;
         assert_json_diff::assert_json_matches_no_panic(
             &info,
             &info1,
             assert_json_diff::Config::new(assert_json_diff::CompareMode::Strict),
         )
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        .map_err(std::io::Error::other)?;
 
         Ok(())
     }
 
     #[test]
     fn test_parse_video_groups() {
-        ffmpeg_init();
+        initialize(log::Level::Error).unwrap();
 
         let paths = get_paths();
 
@@ -195,7 +194,7 @@ mod tests {
     }
 
     fn check_video_frame_count(file: &Path) -> FFmpegResult {
-        let info = parse_video_group(&file, FrameCalculation::Skip)?;
+        let info = parse_video_group(file, FrameCalculation::Skip)?;
         debug!(
             "parse cost: {:?}",
             info.values()
@@ -205,11 +204,11 @@ mod tests {
             .values()
             .filter(|i| i.stream_type == "Video")
             .collect::<Vec<_>>();
-        info.sort_by(|a, b| a.stream.cmp(&b.stream));
+        info.sort_by_key(|info| info.stream);
 
         for stream in info.iter() {
             assert!(
-                parse_video_stream_frame_count(&file, stream.stream, FrameCalculation::Fast)?
+                parse_video_stream_frame_count(file, stream.stream, FrameCalculation::Fast)?
                     .is_some()
             );
         }
@@ -219,7 +218,7 @@ mod tests {
 
     #[test]
     fn test_frame_counting() {
-        ffmpeg_init();
+        initialize(log::Level::Error).unwrap();
 
         let paths = get_paths();
 

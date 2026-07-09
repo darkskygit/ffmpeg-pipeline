@@ -5,18 +5,26 @@ edition = "2021"
 authors = ["DarkSky <darksky2048@gmail.com>"]
 license = "AGPL-3.0-only"
 
+[features]
+default = []
+build-from-source = ["ffmpeg-next/build"]
+
 [dependencies]
-ffmpeg-next = { version = "7.1.0", features = ["static"] }
-lazy_static = "1.4.0"
-num_cpus = "1.16.0"
-path-ext = "0.1.0"
-rayon = "1.10.0"
+ffmpeg-next = { version = "7.1.0", default-features = false, features = [
+  "codec",
+  "filter",
+  "format",
+  "software-resampling",
+  "software-scaling",
+  "static",
+] }
 thiserror = "1.0.63"
 
-image = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
-serde_json = "1.0.120"
 assert-json-diff = "2.0.2"
+image = { workspace = true }
+rayon = "1.10.0"
+serde_json = "1.0.120"

@@ -2,6 +2,7 @@ use super::*;
 use ffmpeg_next::{format::context, sys, Error};
 use std::{
     ffi::c_void,
+    io::SeekFrom,
     ptr::{null, null_mut},
 };
 
@@ -13,7 +14,9 @@ pub struct BufferedInput {
 
 impl BufferedInput {
     pub fn from_reader(mut reader: impl Readable + 'static) -> FFmpegResult<Self> {
-        let length = reader.stream_len()?;
+        let position = reader.stream_position()?;
+        let length = reader.seek(SeekFrom::End(0))?;
+        reader.seek(SeekFrom::Start(position))?;
         let cursor = Box::new(reader) as Box<dyn Readable>;
         let ctx = Box::new(AVInputContextData { cursor, length });
         let (io_ctx, input) = Self::input_buffer(ctx.as_ref())?;

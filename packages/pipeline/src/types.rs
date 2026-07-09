@@ -21,7 +21,7 @@ pub use ffmpeg_next::{
     ChannelLayout, Stream,
 };
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Copy)]
 pub enum FrameCalculation {
     #[default]
     Skip,
@@ -43,9 +43,9 @@ impl Default for StreamFormat {
     }
 }
 
-impl ToString for StreamFormat {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for StreamFormat {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmtResult {
+        let format = match self {
             Self::AV1 => "ivf",
             Self::H264 => "h264",
             Self::HEVC => "hevc",
@@ -53,8 +53,8 @@ impl ToString for StreamFormat {
                 warn!("unknown stream format: {}, get rawvideo", fmt);
                 "rawvideo"
             }
-        }
-        .into()
+        };
+        f.write_str(format)
     }
 }
 
@@ -74,13 +74,13 @@ pub enum StreamFrame {
     Eof,
 }
 
-impl ToString for StreamFrame {
-    fn to_string(&self) -> String {
-        match self {
-            StreamFrame::Audio(_) => "Audio".into(),
-            StreamFrame::Video(_) => "Video".into(),
-            StreamFrame::Eof => "Eof".into(),
-        }
+impl Display for StreamFrame {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmtResult {
+        f.write_str(match self {
+            StreamFrame::Audio(_) => "Audio",
+            StreamFrame::Video(_) => "Video",
+            StreamFrame::Eof => "Eof",
+        })
     }
 }
 
@@ -175,7 +175,7 @@ impl VideoInfo {
         self
     }
     fn get_unnamed_title(&self) -> String {
-        format!("!unnamed_stream_{}", &self.stream)
+        format!("!unnamed_stream_{}", self.stream)
     }
     fn get_filename(&self) -> String {
         self.metadata

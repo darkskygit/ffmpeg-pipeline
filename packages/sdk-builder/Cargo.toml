@@ -1,0 +1,28 @@
+[package]
+name = "ffmpeg-sdk-builder"
+version = "0.1.0"
+edition = "2021"
+authors = ["DarkSky <darksky2048@gmail.com>"]
+description = "A library for compiling FFmpeg and its dependencies"
+license = "AGPL-3.0-only"
+
+[features]
+default = []
+build-from-source = ["dep:cmake", "dep:gix"]
+
+[dependencies]
+cmake = { version = "0.1", optional = true }
+flate2 = "1"
+gix = { version = "0.72.1", optional = true, features = [
+    "worktree-mutation",
+    "blocking-network-client",
+    "blocking-http-transport-reqwest-rust-tls",
+] }
+reqwest = { version = "0.12", default-features = false, features = [
+    "blocking",
+    "rustls-tls",
+] }
+sha2 = "0.10"
+tar = "0.4"
+tempfile = "3"
+thiserror = "1.0.69"

@@ -10,20 +10,36 @@ pub use params::EncodeParams;
 mod tests {
     use super::*;
     use ffmpeg_next::codec::Id;
-    use std::{
-        fs::{read, write},
-        io::Cursor,
-    };
+    use std::io::Cursor;
+
+    fn silent_wav(sample_count: u32) -> Vec<u8> {
+        let data_len = sample_count * 2;
+        let mut wav = Vec::with_capacity((44 + data_len) as usize);
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&(36 + data_len).to_le_bytes());
+        wav.extend_from_slice(b"WAVEfmt ");
+        wav.extend_from_slice(&16_u32.to_le_bytes());
+        wav.extend_from_slice(&1_u16.to_le_bytes());
+        wav.extend_from_slice(&1_u16.to_le_bytes());
+        wav.extend_from_slice(&48_000_u32.to_le_bytes());
+        wav.extend_from_slice(&96_000_u32.to_le_bytes());
+        wav.extend_from_slice(&2_u16.to_le_bytes());
+        wav.extend_from_slice(&16_u16.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&data_len.to_le_bytes());
+        wav.resize((44 + data_len) as usize, 0);
+        wav
+    }
 
     #[test]
     fn test_encode_audio() {
-        ffmpeg_init();
+        initialize(log::Level::Error).unwrap();
 
-        let buffer = read("../../tests/assets/test.m4a").unwrap();
+        let buffer = silent_wav(4_800);
         let index = 0;
 
         let mut input = input_buffer(buffer).unwrap();
-        let mut output = output_buffer("opus").unwrap();
+        let mut output = output_buffer("ogg").unwrap();
 
         let decoder = Decoder::new_with_audio(input.as_mut(), index, FrameProcess::Decode).unwrap();
         {
@@ -60,7 +76,7 @@ mod tests {
             encoder.encode_frame().unwrap();
         }
 
-        let buffer = output.into_inner::<Cursor<Vec<_>>>().unwrap();
-        write("../../tests/tmp/test.opus", buffer.into_inner()).unwrap();
+        let buffer = output.into_inner::<Cursor<Vec<_>>>().unwrap().into_inner();
+        assert!(buffer.starts_with(b"OggS"));
     }
 }

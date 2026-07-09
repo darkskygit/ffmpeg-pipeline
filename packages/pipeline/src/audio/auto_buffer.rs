@@ -10,7 +10,7 @@ use ffmpeg_next::{
 /// may not be the same as the frame size of the encoder, this filter graph will handle the
 /// re-sample and frame split.
 pub struct AutoAudioBuffer {
-    graph: Graph,
+    _graph: Graph,
     input: Context,
     output: Context,
 }
@@ -67,7 +67,7 @@ impl AutoAudioBuffer {
         let output = graph.get("out").unwrap();
 
         Ok(Self {
-            graph,
+            _graph: graph,
             input,
             output,
         })

@@ -9,8 +9,32 @@ pub struct Scaler {
     scaler: ScalerContext,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ScalingAlgorithm {
+    Bilinear,
+    Bicubic,
+    #[default]
+    Spline,
+    Lanczos,
+}
+
 impl Scaler {
     pub fn new(size: &FrameSize, src_format: Pixel, dst_format: Pixel) -> FFmpegResult<Self> {
+        Self::with_algorithm(size, src_format, dst_format, ScalingAlgorithm::default())
+    }
+
+    pub fn with_algorithm(
+        size: &FrameSize,
+        src_format: Pixel,
+        dst_format: Pixel,
+        algorithm: ScalingAlgorithm,
+    ) -> FFmpegResult<Self> {
+        let flags = match algorithm {
+            ScalingAlgorithm::Bilinear => ScalerFlags::BILINEAR,
+            ScalingAlgorithm::Bicubic => ScalerFlags::BICUBIC,
+            ScalingAlgorithm::Spline => ScalerFlags::SPLINE,
+            ScalingAlgorithm::Lanczos => ScalerFlags::LANCZOS,
+        };
         Ok(Self {
             scaler: ScalerContext::get(
                 src_format,
@@ -19,7 +43,7 @@ impl Scaler {
                 dst_format,
                 size.width as u32,
                 size.height as u32,
-                ScalerFlags::SPLINE,
+                flags,
             )?,
         })
     }

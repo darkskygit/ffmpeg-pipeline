@@ -121,7 +121,7 @@ impl From<&Decoder<'_>> for EncodeParams {
             StreamDecoder::Audio(decoder) => EncodeParams::Audio {
                 bitrate: decoder.bit_rate(),
                 rate: decoder.rate() as i32,
-                channel_layout: decoder.channel_layout(),
+                channel_layout: decoder_channel_layout(decoder),
                 compression: None,
                 time_base: decoder.time_base(),
                 global_header: false,

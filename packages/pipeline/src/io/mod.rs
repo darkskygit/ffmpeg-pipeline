@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn test_read_attachment() {
-        ffmpeg_init();
+        initialize(log::Level::Error).unwrap();
 
         let paths = std::fs::read_dir("/Users/ds/Resilio Sync/CG")
             .unwrap()
@@ -94,13 +94,13 @@ mod tests {
 
         paths.par_iter().for_each(|file| {
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
-                match parse_video_group(&file, FrameCalculation::Skip) {
+                match parse_video_group(file, FrameCalculation::Skip) {
                     Ok(groups) => {
                         for group in groups.values() {
                             if group.stream_type != "Attachment" {
                                 continue;
                             }
-                            assert!(read_attachment(&file, group.stream as usize).is_ok());
+                            assert!(read_attachment(file, group.stream as usize).is_ok());
                         }
                     }
                     Err(e) => debug!("file {}: error: {:?}", file.display(), e),

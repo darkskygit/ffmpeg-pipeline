@@ -1,11 +1,22 @@
 [workspace]
-members = ["packages/pipeline"]
+members = [
+  "packages/ffmpeg-sys-next",
+  "packages/pipeline",
+  "packages/sdk",
+  "packages/sdk-builder",
+]
+resolver = "2"
 
 [workspace.dependencies]
 ffmpeg-pipeline = { path = "packages/pipeline" }
-image = { version = "0.25.0", default-features = false }
-log = "0.4.21"
-serde = { version = "1.0.194", features = ["derive"] }
+ffmpeg-pipeline-sdk = { path = "packages/sdk", default-features = false }
+ffmpeg-sdk-builder = { path = "packages/sdk-builder", default-features = false }
+image = { version = "0.25", default-features = false }
+log = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+
+[patch.crates-io]
+ffmpeg-sys-next = { path = "packages/ffmpeg-sys-next" }
 
 [profile.dev]
 opt-level = 1

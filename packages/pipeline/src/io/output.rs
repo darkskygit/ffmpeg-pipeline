@@ -1,7 +1,6 @@
 use super::*;
 use ffmpeg_next::{format::context, sys, Error};
 use std::{
-    any::Any,
     ffi::{c_void, CString},
     ptr::null_mut,
 };
@@ -59,7 +58,7 @@ impl BufferedOutput {
             (*self.output.as_mut_ptr()).pb = null_mut();
         }
 
-        let cursor: Box<dyn Any> = self._ctx.cursor;
+        let cursor = self._ctx.cursor.into_any();
         if let Ok(cursor) = cursor.downcast::<T>() {
             Ok(*cursor)
         } else {
@@ -91,7 +90,7 @@ mod tests {
     use std::{fs::File, io::Read};
 
     fn init() {
-        ffmpeg_init_with_level(log::Level::Debug);
+        initialize(log::Level::Debug).unwrap();
     }
 
     fn get_buffer<P: AsRef<Path>>(path: P) -> Vec<u8> {
@@ -137,8 +136,8 @@ mod tests {
         let params = EncodeParams::from(&decoder)
             .with_bitrate(64 * 1024)
             .with_vbr(true);
-        let mut encoder = Encoder::new(output.as_mut(), Id::OPUS, params).unwrap();
-        let mut buffer = AutoAudioBuffer::new(&decoder, &encoder).unwrap();
+        let encoder = Encoder::new(output.as_mut(), Id::OPUS, params).unwrap();
+        let _buffer = AutoAudioBuffer::new(&decoder, &encoder).unwrap();
 
         // for (idx, frame) in frames.enumerate() {
         //     match frame {

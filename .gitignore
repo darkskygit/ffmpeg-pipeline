@@ -1,4 +1,6 @@
 /target
+/.build
+/ffmpeg-sdk
 tests/assets
 tmp
 .DS_Store

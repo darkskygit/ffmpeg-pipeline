@@ -22,7 +22,7 @@ impl<'o> Encoder<'o> {
         codec_params: EncodeParams,
     ) -> FFmpegResult<Self> {
         let codec = encoder::find(codec_id).ok_or(FFmpegError::CodecNotFound(codec_id))?;
-        let mut stream = output.add_stream(codec.clone())?;
+        let mut stream = output.add_stream(codec)?;
         let mut encoder = Context::from_parameters(stream.parameters())?.encoder();
         encoder.compliance(Compliance::Experimental);
 
@@ -75,7 +75,7 @@ impl<'o> Encoder<'o> {
                     unsafe {
                         match av_opt_set_int(
                             (*encoder.as_mut_ptr()).priv_data,
-                            "vbr\0".as_ptr() as *const i8,
+                            c"vbr".as_ptr(),
                             2,
                             0,
                         ) {
@@ -175,7 +175,7 @@ impl<'o> Encoder<'o> {
                 while encoder.receive_packet(&mut encoded).is_ok() {
                     encoded.set_stream(self.index);
                     encoded.rescale_ts(self.in_time_base, self.out_time_base);
-                    encoded.write_interleaved(&mut self.output)?;
+                    encoded.write_interleaved(self.output)?;
                 }
             }
             StreamEncoder::Video(ref mut _encoder) => {

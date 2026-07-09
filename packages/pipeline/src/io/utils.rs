@@ -13,9 +13,15 @@ pub trait Readable: Read + Seek {}
 
 impl<T: Read + Seek> Readable for T {}
 
-pub trait Writable: Seek + Write + Any {}
+pub trait Writable: Seek + Write + Any {
+    fn into_any(self: Box<Self>) -> Box<dyn Any>;
+}
 
-impl<T: Seek + Write + Any> Writable for T {}
+impl<T: Seek + Write + Any> Writable for T {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+}
 
 #[repr(C)]
 pub struct AVInputContextData {
@@ -33,7 +39,13 @@ unsafe extern "C" fn read(opaque: *mut c_void, buf: *mut u8, buf_size: i32) -> i
     let ctx = &mut *(opaque as *mut AVInputContextData);
     let slice = from_raw_parts_mut(buf, buf_size as usize);
     match ctx.cursor.read(slice) {
-        Ok(size) => (size != 0).then_some(size as i32).unwrap_or(AVERROR_EOF),
+        Ok(size) => {
+            if size != 0 {
+                size as i32
+            } else {
+                AVERROR_EOF
+            }
+        }
         Err(_) => -1,
     }
 }

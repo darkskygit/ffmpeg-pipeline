@@ -1,6 +1,15 @@
 use super::*;
 use ffmpeg_next::{codec::context::Context, media::Type as MediaType, Codec, Rational, Stream};
 
+pub(crate) fn decoder_channel_layout(decoder: &ffmpeg_next::decoder::Audio) -> ChannelLayout {
+    let layout = decoder.channel_layout();
+    if layout.is_empty() {
+        ChannelLayout::default(decoder.channels().into())
+    } else {
+        layout
+    }
+}
+
 #[derive(Clone)]
 pub struct AudioSpec {
     pub(super) sample_rate: u32,
@@ -50,14 +59,14 @@ impl TryFrom<&Decoder<'_>> for AudioSpec {
     type Error = FFmpegError;
     fn try_from(decoder: &Decoder<'_>) -> Result<Self, Self::Error> {
         match decoder.get_decoder() {
-            StreamDecoder::Audio(decoder) => {
-                Ok(
-                    Self::new(decoder.channel_layout(), decoder.format(), decoder.rate())
-                        .with_codec(decoder.codec())
-                        .with_frame_size(decoder.frame_size())
-                        .with_time_base(decoder.time_base()),
-                )
-            }
+            StreamDecoder::Audio(decoder) => Ok(Self::new(
+                decoder_channel_layout(decoder),
+                decoder.format(),
+                decoder.rate(),
+            )
+            .with_codec(decoder.codec())
+            .with_frame_size(decoder.frame_size())
+            .with_time_base(decoder.time_base())),
             _ => Err(FFmpegError::InvalidStreamType("Video".into())),
         }
     }
@@ -86,12 +95,14 @@ impl TryFrom<&Stream<'_>> for AudioSpec {
         let codec = Context::from_parameters(stream.parameters())?;
         if codec.medium() == MediaType::Audio {
             let decoder = codec.decoder().audio()?;
-            Ok(
-                AudioSpec::new(decoder.channel_layout(), decoder.format(), decoder.rate())
-                    .with_codec(decoder.codec())
-                    .with_frame_size(decoder.frame_size())
-                    .with_time_base(decoder.time_base()),
+            Ok(AudioSpec::new(
+                decoder_channel_layout(&decoder),
+                decoder.format(),
+                decoder.rate(),
             )
+            .with_codec(decoder.codec())
+            .with_frame_size(decoder.frame_size())
+            .with_time_base(decoder.time_base()))
         } else {
             Err(FFmpegError::CodecNotFound(stream.parameters().id()))
         }

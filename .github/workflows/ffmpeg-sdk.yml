@@ -1,0 +1,79 @@
+name: Build static FFmpeg SDK
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["sdk-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  sdk:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: macos-15
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-07-07
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+        with:
+          arch: x64
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          path-type: inherit
+          install: >-
+            base-devel
+            diffutils
+            make
+            nasm
+            pkg-config
+      - name: Install macOS build tools
+        if: runner.os == 'macOS'
+        run: brew install nasm pkg-config
+      - name: Build SDK
+        if: runner.os == 'macOS'
+        run: scripts/build-ffmpeg-sdk.sh
+      - name: Build SDK
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: scripts/build-ffmpeg-sdk.sh
+      - name: Validate Rust bindings
+        shell: bash
+        env:
+          FFMPEG_DIR: ${{ github.workspace }}/ffmpeg-sdk
+        run: cargo test -p ffmpeg-pipeline encode::tests::test_encode_audio -- --exact
+      - name: Package SDK
+        shell: bash
+        run: |
+          asset="ffmpeg-sdk-${{ matrix.target }}.tar.gz"
+          tar -czf "$asset" -C ffmpeg-sdk .
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$asset" > "$asset.sha256"
+          else
+            shasum -a 256 "$asset" > "$asset.sha256"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-sdk-${{ matrix.target }}
+          path: |
+            ffmpeg-sdk-${{ matrix.target }}.tar.gz
+            ffmpeg-sdk-${{ matrix.target }}.tar.gz.sha256
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/sdk-v')
+        with:
+          files: |
+            ffmpeg-sdk-${{ matrix.target }}.tar.gz
+            ffmpeg-sdk-${{ matrix.target }}.tar.gz.sha256
