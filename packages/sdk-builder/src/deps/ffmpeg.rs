@@ -1,6 +1,8 @@
 //! FFmpeg 编译模块
 
 use std::collections::HashSet;
+#[cfg(target_os = "windows")]
+use std::env;
 use std::io::Result;
 #[cfg(target_os = "windows")]
 use std::path::Path;
@@ -139,6 +141,19 @@ impl<'a> FFmpegBuilder<'a> {
                 AudioCodec::FLAC => {
                     audio_decoders.push("flac".to_string());
                 }
+                AudioCodec::PCM => {
+                    audio_decoders.extend(
+                        [
+                            "pcm_s16le",
+                            "pcm_s24le",
+                            "pcm_s32le",
+                            "pcm_f32le",
+                            "pcm_f64le",
+                            "pcm_u8",
+                        ]
+                        .map(str::to_string),
+                    );
+                }
             }
         }
 
@@ -170,6 +185,10 @@ impl<'a> FFmpegBuilder<'a> {
                 MuxerFormat::MOV => {
                     muxers.push("mov".to_string());
                     demuxers.push("mov".to_string());
+                }
+                MuxerFormat::WAV => {
+                    muxers.push("wav".to_string());
+                    demuxers.push("wav".to_string());
                 }
             }
         }
@@ -532,20 +551,6 @@ impl<'a> FFmpegBuilder<'a> {
         configure_options.push_str("--toolchain=msvc ");
         configure_options.push_str("--pkg-config=pkg-config ");
 
-        // Point FFmpeg at the installed zlib headers and library.
-        if self.components.contains(&Component::ZLib) {
-            let zlib_include_dir = self.output_dir.join("include");
-            let zlib_lib_dir = self.output_dir.join("lib");
-            configure_options.push_str(&format!(
-                "--extra-cflags=\"-I{}\" ",
-                Self::to_msys_path(&zlib_include_dir)
-            ));
-            configure_options.push_str(&format!(
-                "--extra-ldflags=\"-LIBPATH:{}\" ",
-                Self::to_msys_path(&zlib_lib_dir)
-            ));
-        }
-
         // 添加其他选项
         configure_options.push_str("--enable-small ");
 
@@ -557,7 +562,10 @@ set -e
 export PKG_CONFIG_PATH="{}:$PKG_CONFIG_PATH"
 mkdir -p "{}"
 cd "{}"
-./configure {}
+if ! ./configure {}; then
+  cat ffbuild/config.log
+  exit 1
+fi
 make -B -j{}
 make install
 "#,
@@ -572,11 +580,22 @@ make install
         fs::write(&build_script_path, &msys_script)?;
 
         // 创建执行 MSYS2 的批处理文件
-        let msys_cmd = r#"
+        let msys2_root = env::var("MSYS2_LOCATION").unwrap_or_else(|_| r"C:\msys64".into());
+        let msys_launcher = PathBuf::from(msys2_root).join("msys2_shell.cmd");
+        let include_dir = self.output_dir.join("include");
+        let lib_dir = self.output_dir.join("lib");
+        let msys_cmd = format!(
+            r#"
 @echo off
 set MSYS2_PATH_TYPE=inherit
-C:\msys64\msys2_shell.cmd -defterm -here -no-start -ucrt64 -c "chmod +x build_ffmpeg.sh && ./build_ffmpeg.sh"
-"#;
+set "INCLUDE={};%INCLUDE%"
+set "LIB={};%LIB%"
+call "{}" -defterm -here -no-start -mingw64 -c "chmod +x build_ffmpeg.sh && ./build_ffmpeg.sh"
+"#,
+            include_dir.display(),
+            lib_dir.display(),
+            msys_launcher.display()
+        );
 
         let run_script_path = script_dir.join("run_msys.bat");
         fs::write(&run_script_path, msys_cmd)?;

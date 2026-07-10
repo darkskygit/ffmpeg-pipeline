@@ -1,7 +1,5 @@
 //! Opus build module.
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-use cmake::Config;
 use std::fs;
 use std::io::{self, Result};
 use std::path::PathBuf;
@@ -78,16 +76,21 @@ impl<'a> OpusBuilder<'a> {
 
         utils::log_info("Building Opus with CMake...", self.verbose);
 
-        Config::new(&opus_src_dir)
-            .define("CMAKE_INSTALL_PREFIX", self.output_dir)
-            .define("CMAKE_BUILD_TYPE", "Release")
-            .define("BUILD_SHARED_LIBS", "OFF")
-            .define("OPUS_OSCE", "ON")
-            .define("OPUS_STATIC_RUNTIME", "ON")
-            .generator("Unix Makefiles")
-            .out_dir(&opus_build_dir)
-            .build_target("install")
-            .build();
+        utils::run_cmake_install(
+            &opus_src_dir,
+            &opus_build_dir,
+            self.output_dir,
+            &[
+                "-DBUILD_SHARED_LIBS=OFF".to_string(),
+                "-DOPUS_BUILD_SHARED_LIBRARY=OFF".to_string(),
+                "-DOPUS_BUILD_TESTING=OFF".to_string(),
+                "-DOPUS_BUILD_PROGRAMS=OFF".to_string(),
+                "-DOPUS_OSCE=ON".to_string(),
+                "-DOPUS_STATIC_RUNTIME=ON".to_string(),
+            ],
+            self.job_count,
+            "Opus",
+        )?;
 
         utils::log_success("Opus build finished", self.verbose);
         Ok(())
@@ -110,6 +113,9 @@ impl<'a> OpusBuilder<'a> {
             &[
                 "-DCMAKE_BUILD_TYPE=Release".to_string(),
                 "-DBUILD_SHARED_LIBS=OFF".to_string(),
+                "-DOPUS_BUILD_SHARED_LIBRARY=OFF".to_string(),
+                "-DOPUS_BUILD_TESTING=OFF".to_string(),
+                "-DOPUS_BUILD_PROGRAMS=OFF".to_string(),
                 "-DOPUS_OSCE=ON".to_string(),
                 "-DOPUS_STATIC_RUNTIME=ON".to_string(),
                 "-DCMAKE_C_FLAGS_RELEASE=/MT /GL".to_string(),

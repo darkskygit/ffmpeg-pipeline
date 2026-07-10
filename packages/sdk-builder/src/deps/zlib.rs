@@ -82,8 +82,9 @@ impl<'a> ZlibBuilder<'a> {
             self.output_dir,
             &[
                 "-DCMAKE_BUILD_TYPE=Release".to_string(),
-                "-DBUILD_SHARED_LIBS=OFF".to_string(),
-                "-DZLIB_BUILD_EXAMPLES=OFF".to_string(),
+                "-DZLIB_BUILD_SHARED=OFF".to_string(),
+                "-DZLIB_BUILD_STATIC=ON".to_string(),
+                "-DZLIB_BUILD_TESTING=OFF".to_string(),
                 "-DCMAKE_C_FLAGS_RELEASE=/MT /GL".to_string(),
                 "-DCMAKE_CXX_FLAGS_RELEASE=/MT /GL".to_string(),
                 "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>".to_string(),
@@ -94,14 +95,21 @@ impl<'a> ZlibBuilder<'a> {
         )?;
 
         let installed_lib_dir = self.output_dir.join("lib");
+        let installed_static_lib = installed_lib_dir.join("zs.lib");
         let installed_zlib_lib = installed_lib_dir.join("zlib.lib");
-        let installed_zlibstatic_lib = installed_lib_dir.join("zlibstatic.lib");
-        if !installed_zlib_lib.exists() && installed_zlibstatic_lib.exists() {
-            fs::copy(&installed_zlibstatic_lib, &installed_zlib_lib)?;
-        }
         let ffmpeg_zlib = installed_lib_dir.join("z.lib");
-        if !ffmpeg_zlib.exists() && installed_zlibstatic_lib.exists() {
-            fs::copy(&installed_zlibstatic_lib, ffmpeg_zlib)?;
+        if installed_static_lib.is_file() {
+            fs::copy(&installed_static_lib, &installed_zlib_lib)?;
+            fs::copy(&installed_static_lib, &ffmpeg_zlib)?;
+        }
+        if !installed_static_lib.is_file()
+            || !installed_zlib_lib.is_file()
+            || !ffmpeg_zlib.is_file()
+            || !self.output_dir.join("include/zlib.h").is_file()
+        {
+            return Err(io::Error::other(
+                "zlib install did not produce include/zlib.h, lib/zs.lib, lib/zlib.lib, and lib/z.lib",
+            ));
         }
 
         utils::log_success(

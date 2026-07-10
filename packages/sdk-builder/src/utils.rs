@@ -4,9 +4,7 @@ use std::env;
 use std::fs;
 use std::io::{self, Result, Write};
 use std::path::Path;
-#[cfg(target_os = "windows")]
-use std::process::Command;
-use std::process::Output;
+use std::process::{Command, Output};
 use std::time::SystemTime;
 use tar::Archive;
 
@@ -48,6 +46,7 @@ pub fn handle_command_output(output: Result<Output>, step: &str) -> Result<()> {
     match output {
         Ok(output) => {
             if !output.status.success() {
+                io::stderr().write_all(&output.stdout)?;
                 io::stderr().write_all(&output.stderr)?;
                 return Err(io::Error::other(format!(
                     "{} command failed with exit code {:?}",
@@ -62,6 +61,45 @@ pub fn handle_command_output(output: Result<Output>, step: &str) -> Result<()> {
             Err(e)
         }
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn run_cmake_install(
+    source_dir: &Path,
+    build_dir: &Path,
+    output_dir: &Path,
+    definitions: &[String],
+    job_count: usize,
+    step_name: &str,
+) -> Result<()> {
+    let mut configure_args = vec![
+        "-S".to_string(),
+        source_dir.to_string_lossy().into_owned(),
+        "-B".to_string(),
+        build_dir.to_string_lossy().into_owned(),
+        format!("-DCMAKE_INSTALL_PREFIX={}", output_dir.display()),
+        "-DCMAKE_BUILD_TYPE=Release".to_string(),
+    ];
+    configure_args.extend(definitions.iter().cloned());
+
+    let configure_output = Command::new("cmake").args(&configure_args).output()?;
+    handle_command_output(Ok(configure_output), &format!("Configure {step_name}"))?;
+
+    let build_output = Command::new("cmake")
+        .args([
+            "--build",
+            &build_dir.to_string_lossy(),
+            "--parallel",
+            &job_count.to_string(),
+        ])
+        .output()?;
+    handle_command_output(Ok(build_output), &format!("Build {step_name}"))?;
+
+    let install_output = Command::new("cmake")
+        .args(["--install", &build_dir.to_string_lossy()])
+        .output()?;
+    handle_command_output(Ok(install_output), &format!("Install {step_name}"))?;
+    Ok(())
 }
 
 #[cfg(target_os = "windows")]
@@ -79,14 +117,11 @@ pub fn run_windows_cmake_build(
         source_dir.to_string_lossy().into_owned(),
         "-B".to_string(),
         build_dir.to_string_lossy().into_owned(),
-        "-G".to_string(),
-        "Visual Studio 17 2022".to_string(),
-        "-A".to_string(),
-        "x64".to_string(),
-        "-T".to_string(),
-        "host=x64".to_string(),
         format!("-DCMAKE_INSTALL_PREFIX={}", output_dir.display()),
     ];
+    configure_args.extend(cmake_generator_args(
+        env::var("CMAKE_GENERATOR").ok().as_deref(),
+    ));
     configure_args.extend(definitions.iter().cloned());
 
     let configure_output = Command::new("cmake").args(&configure_args).output()?;
@@ -105,6 +140,23 @@ pub fn run_windows_cmake_build(
     handle_command_output(Ok(build_output), &format!("Build {}", step_name))?;
 
     Ok(())
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn cmake_generator_args(generator: Option<&str>) -> Vec<String> {
+    let Some(generator) = generator.filter(|value| !value.trim().is_empty()) else {
+        return Vec::new();
+    };
+    let mut arguments = vec!["-G".to_string(), generator.to_string()];
+    if generator.starts_with("Visual Studio ") {
+        arguments.extend([
+            "-A".to_string(),
+            "x64".to_string(),
+            "-T".to_string(),
+            "host=x64".to_string(),
+        ]);
+    }
+    arguments
 }
 
 #[cfg(target_os = "windows")]
@@ -319,4 +371,22 @@ pub fn update_cache(build_path: &Path) -> Result<()> {
 
     fs::write(cache_file, now.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cmake_generator_args;
+
+    #[test]
+    fn configures_visual_studio_generator_architecture() {
+        assert_eq!(
+            cmake_generator_args(Some("Visual Studio 18 2026")),
+            ["-G", "Visual Studio 18 2026", "-A", "x64", "-T", "host=x64"]
+        );
+    }
+
+    #[test]
+    fn lets_cmake_choose_when_generator_is_unset() {
+        assert!(cmake_generator_args(None).is_empty());
+    }
 }

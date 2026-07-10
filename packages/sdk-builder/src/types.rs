@@ -20,6 +20,8 @@ pub enum AudioCodec {
     MP3,
     /// FLAC 无损音频编解码器
     FLAC,
+    /// PCM 音频编解码器
+    PCM,
 }
 
 /// 视频编解码器
@@ -48,4 +50,6 @@ pub enum MuxerFormat {
     Ogg,
     /// MOV 容器格式（.mov）
     MOV,
+    /// WAV 容器格式（.wav）
+    WAV,
 }

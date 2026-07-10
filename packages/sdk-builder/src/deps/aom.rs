@@ -1,13 +1,11 @@
 //! AOM build module.
 
-#[cfg(not(target_os = "windows"))]
-use cmake::Config;
 use std::io::Result;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::utils;
 
-const AOM_VERSION: &str = "3.12.1";
+const AOM_VERSION: &str = "3.14.1";
 
 pub struct AomBuilder<'a> {
     source_dir: &'a PathBuf,
@@ -57,47 +55,29 @@ impl<'a> AomBuilder<'a> {
         Ok(())
     }
 
-    #[cfg(not(target_os = "windows"))]
-    fn base_cmake_config(&self, aom_dir: &Path, aom_build_dir: &Path) -> Config {
-        let mut config = Config::new(aom_dir);
-        config
-            .define("CMAKE_INSTALL_PREFIX", self.output_dir)
-            .define("BUILD_SHARED_LIBS", "OFF")
-            .define("ENABLE_DOCS", "OFF")
-            .define("ENABLE_EXAMPLES", "OFF")
-            .define("ENABLE_TESTS", "OFF")
-            .define("ENABLE_TESTDATA", "OFF")
-            .define("ENABLE_TOOLS", "OFF")
-            .define("ENABLE_NASM", "ON")
-            .define("CONFIG_AV1_ENCODER", "0")
-            .out_dir(aom_build_dir);
-        config
-    }
-
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     pub fn build(&self) -> Result<()> {
         self.build_aom_common()?;
 
         let aom_dir = self.source_checkout_dir();
         let aom_build_dir = self.build_dir();
-
-        let mut config = self.base_cmake_config(&aom_dir, &aom_build_dir);
-        config.build_target("install").build();
-
-        utils::log_success("AOM build finished", self.verbose);
-        Ok(())
-    }
-
-    #[cfg(target_os = "linux")]
-    pub fn build(&self) -> Result<()> {
-        self.build_aom_common()?;
-
-        let aom_dir = self.source_checkout_dir();
-        let aom_build_dir = self.build_dir();
-
-        let mut config = self.base_cmake_config(&aom_dir, &aom_build_dir);
-        config.generator("Unix Makefiles");
-        config.build_target("install").build();
+        utils::run_cmake_install(
+            &aom_dir,
+            &aom_build_dir,
+            self.output_dir,
+            &[
+                "-DBUILD_SHARED_LIBS=OFF".to_string(),
+                "-DENABLE_DOCS=OFF".to_string(),
+                "-DENABLE_EXAMPLES=OFF".to_string(),
+                "-DENABLE_TESTS=OFF".to_string(),
+                "-DENABLE_TESTDATA=OFF".to_string(),
+                "-DENABLE_TOOLS=OFF".to_string(),
+                "-DENABLE_NASM=ON".to_string(),
+                "-DCONFIG_AV1_ENCODER=0".to_string(),
+            ],
+            self.job_count,
+            "AOM",
+        )?;
 
         utils::log_success("AOM build finished", self.verbose);
         Ok(())

@@ -18,12 +18,14 @@ pub fn pipeline_sdk_builder(
             AudioCodec::AAC,
             AudioCodec::MP3,
             AudioCodec::FLAC,
+            AudioCodec::PCM,
         ])
         .with_muxer_formats([
             MuxerFormat::Matroska,
             MuxerFormat::MP4,
             MuxerFormat::Ogg,
             MuxerFormat::MOV,
+            MuxerFormat::WAV,
         ])
         .enable_hwaccel(false)
         .use_cache(true)
