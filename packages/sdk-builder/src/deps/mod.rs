@@ -63,7 +63,11 @@ impl FFmpegCompiler {
             self.verbose,
         );
 
-        for tool in ["cmake", "make", "nasm", "pkg-config"] {
+        let mut tools = vec!["cmake", "make", "pkg-config"];
+        if cfg!(target_arch = "x86_64") {
+            tools.push("nasm");
+        }
+        for tool in tools {
             if !Command::new("which").arg(tool).status()?.success() {
                 return Err(std::io::Error::other(format!(
                     "build-from-source requires {tool} in PATH"

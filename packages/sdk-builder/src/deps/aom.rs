@@ -72,7 +72,14 @@ impl<'a> AomBuilder<'a> {
                 "-DENABLE_TESTS=OFF".to_string(),
                 "-DENABLE_TESTDATA=OFF".to_string(),
                 "-DENABLE_TOOLS=OFF".to_string(),
-                "-DENABLE_NASM=ON".to_string(),
+                format!(
+                    "-DENABLE_NASM={}",
+                    if cfg!(target_arch = "x86_64") {
+                        "ON"
+                    } else {
+                        "OFF"
+                    }
+                ),
                 "-DCONFIG_AV1_ENCODER=0".to_string(),
             ],
             self.job_count,
