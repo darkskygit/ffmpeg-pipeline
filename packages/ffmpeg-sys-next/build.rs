@@ -961,7 +961,14 @@ fn link_to_libraries(statik: bool) {
 }
 
 fn link_sdk_dependencies(library_dir: &Path, statik: bool) {
-    let kind = if statik { "static" } else { "dylib" };
+    // Preserve MSVC LTCG library indexes instead of rebuilding them inside the Rust rlib.
+    let kind = if statik && env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
+        "static:-bundle"
+    } else if statik {
+        "static"
+    } else {
+        "dylib"
+    };
     for library in ["aom", "opus", "z"] {
         if library_exists(library_dir, library) {
             println!("cargo:rustc-link-lib={kind}={library}");
