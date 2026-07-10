@@ -81,6 +81,33 @@ unsafe extern "C" fn seek(opaque: *mut c_void, offset: i64, whence: i32) -> i64 
     }
 }
 
+#[inline]
+unsafe extern "C" fn seek_output(opaque: *mut c_void, offset: i64, whence: i32) -> i64 {
+    let ctx = &mut *(opaque as *mut AVOutputContextData);
+    if whence == AVSEEK_SIZE {
+        let position = match ctx.cursor.stream_position() {
+            Ok(position) => position,
+            Err(_) => return -1,
+        };
+        let size = match ctx.cursor.seek(SeekFrom::End(0)) {
+            Ok(size) => size,
+            Err(_) => return -1,
+        };
+        let _ = ctx.cursor.seek(SeekFrom::Start(position));
+        return size as i64;
+    }
+    let position = match whence {
+        SEEK_SET => SeekFrom::Start(offset as u64),
+        SEEK_CUR => SeekFrom::Current(offset),
+        SEEK_END => SeekFrom::End(offset),
+        _ => return -1,
+    };
+    ctx.cursor
+        .seek(position)
+        .map(|position| position as i64)
+        .unwrap_or(-1)
+}
+
 pub unsafe fn get_avio_context(writable: bool, opaque: *mut c_void) -> *mut AVIOContext {
     avio_alloc_context(
         av_malloc(4096) as *mut u8,
@@ -89,6 +116,10 @@ pub unsafe fn get_avio_context(writable: bool, opaque: *mut c_void) -> *mut AVIO
         opaque,
         if writable { None } else { Some(read) },
         if writable { Some(write) } else { None },
-        if writable { None } else { Some(seek) },
+        if writable {
+            Some(seek_output)
+        } else {
+            Some(seek)
+        },
     )
 }

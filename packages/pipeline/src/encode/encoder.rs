@@ -3,7 +3,7 @@ use ffmpeg_next::{
     codec::{context::Context, Compliance, Flags as CodecFlags, Id},
     encoder,
     ffi::av_opt_set_int,
-    format::context::Output,
+    format::{context::Output, Flags as FormatFlags},
     Packet, Rational,
 };
 
@@ -22,6 +22,8 @@ impl<'o> Encoder<'o> {
         codec_params: EncodeParams,
     ) -> FFmpegResult<Self> {
         let codec = encoder::find(codec_id).ok_or(FFmpegError::CodecNotFound(codec_id))?;
+        let output_requires_global_header =
+            output.format().flags().contains(FormatFlags::GLOBAL_HEADER);
         let mut stream = output.add_stream(codec)?;
         let mut encoder = Context::from_parameters(stream.parameters())?.encoder();
         encoder.compliance(Compliance::Experimental);
@@ -59,18 +61,17 @@ impl<'o> Encoder<'o> {
                 encoder.set_format(
                     codec
                         .formats()
-                        .and_then(|mut f| f.next())
-                        .ok_or(FFmpegError::CodecNotFound(codec_id))
-                        .unwrap(),
+                        .and_then(|mut formats| formats.next())
+                        .ok_or(FFmpegError::CodecNotFound(codec_id))?,
                 );
                 encoder.set_rate(rate);
                 encoder.set_time_base(time_base);
-                if global_header {
+                if global_header || output_requires_global_header {
                     encoder.set_flags(CodecFlags::GLOBAL_HEADER);
                 }
                 stream.set_time_base(time_base);
 
-                let mut encoder = encoder.open_as(codec).unwrap();
+                let mut encoder = encoder.open_as(codec)?;
                 if vbr && encoder.id() == Id::OPUS {
                     unsafe {
                         match av_opt_set_int(
@@ -94,7 +95,7 @@ impl<'o> Encoder<'o> {
             } if codec.is_video() => {
                 let mut encoder = encoder.video()?;
                 encoder.set_time_base(time_base);
-                if global_header {
+                if global_header || output_requires_global_header {
                     encoder.set_flags(CodecFlags::GLOBAL_HEADER);
                 }
                 stream.set_time_base(time_base);

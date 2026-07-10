@@ -130,10 +130,12 @@ impl<'a> FFmpegBuilder<'a> {
         for codec in self.audio_codecs {
             match codec {
                 AudioCodec::Opus => {
+                    audio_decoders.push("libopus".to_string());
                     audio_encoders.push("libopus".to_string());
                 }
                 AudioCodec::AAC => {
                     audio_decoders.push("aac".to_string());
+                    audio_encoders.push("aac".to_string());
                 }
                 AudioCodec::MP3 => {
                     audio_decoders.push("mp3".to_string());

@@ -12,7 +12,7 @@ mod scaler;
 mod types;
 
 pub(crate) use audio::decoder_channel_layout;
-pub use audio::{AudioSpec, AutoAudioBuffer, Resampler};
+pub use audio::{transcode_audio_buffer, AudioSpec, AutoAudioBuffer, Resampler};
 pub use decode::{Decoder, Frame, FrameProcess};
 pub use encode::{EncodeParams, Encoder};
 pub use io::{
@@ -24,9 +24,9 @@ pub use remux::{remux, RemuxRequest, RemuxStream};
 pub use result::{FFmpegError, FFmpegResult};
 pub use scaler::{Scaler, ScalingAlgorithm};
 pub use types::{
-    AudioFrame, ChannelLayout, CodecId, FrameCalculation, FrameSize, Input, Output, Sample,
-    SampleType, Stream, StreamDecoder, StreamEncoder, StreamFormat, StreamFrame, VideoFrame,
-    VideoGroups, VideoInfo, VideoPixel,
+    AudioFrame, ChannelLayout, CodecId, FrameCalculation, FrameSize, Input, MediaType, Output,
+    Sample, SampleType, Stream, StreamDecoder, StreamEncoder, StreamFormat, StreamFrame,
+    VideoFrame, VideoGroups, VideoInfo, VideoPixel,
 };
 
 use ffmpeg_next::{

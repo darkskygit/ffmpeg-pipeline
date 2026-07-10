@@ -1,9 +1,6 @@
 use super::*;
 use ffmpeg_next::{format::context, sys, Error};
-use std::{
-    ffi::{c_void, CString},
-    ptr::null_mut,
-};
+use std::{ffi::CString, mem, ptr::null_mut};
 
 pub struct BufferedOutput {
     _ctx: Box<AVOutputContextData>,
@@ -50,15 +47,24 @@ impl BufferedOutput {
         .map_err(|e| e.into())
     }
 
-    pub fn into_inner<T: Writable>(mut self) -> FFmpegResult<T> {
+    pub fn into_inner<T: Writable>(self) -> FFmpegResult<T> {
         use std::io::{Error, ErrorKind};
 
+        let Self {
+            mut _ctx,
+            mut output,
+            mut io_ctx,
+        } = self;
         unsafe {
-            sys::av_free((*self.io_ctx) as *mut c_void);
-            (*self.output.as_mut_ptr()).pb = null_mut();
+            sys::avio_context_free(io_ctx.as_mut());
+            (*output.as_mut_ptr()).pb = null_mut();
+            sys::avformat_free_context(output.as_mut_ptr());
         }
+        // ffmpeg-next 7.1 always closes Output.pb as URL IO. The custom AVIO and
+        // format context are already released above, so its destructor must not run.
+        mem::forget(output);
 
-        let cursor = self._ctx.cursor.into_any();
+        let cursor = _ctx.cursor.into_any();
         if let Ok(cursor) = cursor.downcast::<T>() {
             Ok(*cursor)
         } else {

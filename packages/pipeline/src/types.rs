@@ -17,6 +17,7 @@ pub use ffmpeg_next::{
         sample::Type as SampleType,
         Pixel as VideoPixel, Sample,
     },
+    media::Type as MediaType,
     util::frame::{audio::Audio as AudioFrame, video::Video as VideoFrame},
     ChannelLayout, Stream,
 };
