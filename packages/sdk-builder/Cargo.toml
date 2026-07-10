@@ -3,8 +3,10 @@ name = "ffmpeg-sdk-builder"
 version = "0.1.0"
 edition = "2021"
 authors = ["DarkSky <darksky2048@gmail.com>"]
-description = "A library for compiling FFmpeg and its dependencies"
+description = "Build support for ffmpeg-pipeline static SDKs"
 license = "AGPL-3.0-only"
+repository = "https://github.com/darkskygit/ffmpeg-pipeline"
+publish = false
 
 [features]
 default = []

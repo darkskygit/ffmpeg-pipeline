@@ -43,15 +43,11 @@ fn main() -> io::Result<()> {
 #[cfg(feature = "build-from-source")]
 fn build_from_source() -> io::Result<()> {
     let output_dir = PathBuf::from(required_env("OUT_DIR")?);
-    let output = pipeline_sdk_builder(output_dir.join("sources"), &output_dir)
+    pipeline_sdk_builder(output_dir.join("sources"), &output_dir)
         .verbose(true)
         .build()
         .compile()?;
-
-    for directive in output {
-        println!("{directive}");
-    }
-    Ok(())
+    validate_and_emit_sdk(&output_dir.join("ffmpeg_build"))
 }
 
 fn validate_and_emit_sdk(directory: &std::path::Path) -> io::Result<()> {
@@ -62,43 +58,8 @@ fn validate_and_emit_sdk(directory: &std::path::Path) -> io::Result<()> {
         )));
     }
 
-    let library_dir = directory.join("lib");
-    println!("cargo:rustc-link-search=native={}", library_dir.display());
-    for library in ["aom", "opus", "z"] {
-        if has_library(&library_dir, library) {
-            println!("cargo:rustc-link-lib=static={library}");
-        }
-    }
-
-    match env::var("CARGO_CFG_TARGET_OS").as_deref() {
-        Ok("macos") => {
-            for library in ["z", "bz2", "iconv"] {
-                println!("cargo:rustc-link-lib={library}");
-            }
-        }
-        Ok("windows") => {
-            for library in ["bcrypt", "ole32", "secur32", "user32", "ws2_32"] {
-                println!("cargo:rustc-link-lib={library}");
-            }
-        }
-        _ => {
-            println!("cargo:rustc-link-lib=z");
-            println!("cargo:rustc-link-lib=bz2");
-        }
-    }
-
     println!("cargo:library={}", directory.display());
     Ok(())
-}
-
-fn has_library(directory: &std::path::Path, name: &str) -> bool {
-    [
-        format!("lib{name}.a"),
-        format!("{name}.lib"),
-        format!("lib{name}.lib"),
-    ]
-    .iter()
-    .any(|file| directory.join(file).is_file())
 }
 
 fn required_env(name: &str) -> io::Result<String> {

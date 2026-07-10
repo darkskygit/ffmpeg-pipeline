@@ -43,7 +43,7 @@ impl<'a> ZlibBuilder<'a> {
         let zlib_tarball = self.source_dir.join("zlib-1.3.2.tar.gz");
         if !zlib_tarball.exists() {
             utils::download_file(
-                "https://zlib.net/zlib-1.3.2.tar.gz",
+                "https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz",
                 &zlib_tarball,
                 self.verbose,
             )?;

@@ -2,8 +2,16 @@
 name = "ffmpeg-pipeline"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.77"
 authors = ["DarkSky <darksky2048@gmail.com>"]
+description = "Composable FFmpeg decoding, encoding, remuxing, and media I/O for Rust"
 license = "AGPL-3.0-only"
+readme = "../../README.md"
+repository = "https://github.com/darkskygit/ffmpeg-pipeline"
+homepage = "https://github.com/darkskygit/ffmpeg-pipeline"
+documentation = "https://docs.rs/ffmpeg-pipeline"
+keywords = ["ffmpeg", "audio", "video", "codec", "multimedia"]
+categories = ["api-bindings", "multimedia::audio", "multimedia::video"]
 
 [features]
 default = []

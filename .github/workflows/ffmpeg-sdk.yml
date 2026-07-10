@@ -58,6 +58,7 @@ jobs:
       - name: Validate Rust bindings
         env:
           FFMPEG_DIR: ${{ github.workspace }}/ffmpeg-sdk
+          RUSTFLAGS: ${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}
         run: cargo test -p ffmpeg-pipeline encode::tests::test_encode_audio -- --exact
       - name: Package SDK
         shell: bash

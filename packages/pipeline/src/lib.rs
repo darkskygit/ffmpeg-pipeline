@@ -1,3 +1,6 @@
+//! Composable decoding, encoding, remuxing, scaling, resampling, and media I/O
+//! built on FFmpeg.
+
 mod audio;
 mod decode;
 mod encode;

@@ -960,45 +960,89 @@ fn link_to_libraries(statik: bool) {
     }
 }
 
+fn link_sdk_dependencies(library_dir: &Path, statik: bool) {
+    let kind = if statik { "static" } else { "dylib" };
+    for library in ["aom", "opus", "z"] {
+        if library_exists(library_dir, library) {
+            println!("cargo:rustc-link-lib={kind}={library}");
+        }
+    }
+
+    match env::var("CARGO_CFG_TARGET_OS").as_deref() {
+        Ok("macos") => {
+            for library in ["z", "bz2", "iconv"] {
+                println!("cargo:rustc-link-lib={library}");
+            }
+        }
+        Ok("windows") => {
+            for library in ["bcrypt", "ole32", "secur32", "user32", "ws2_32"] {
+                println!("cargo:rustc-link-lib={library}");
+            }
+        }
+        _ => {
+            println!("cargo:rustc-link-lib=z");
+            println!("cargo:rustc-link-lib=bz2");
+        }
+    }
+}
+
+fn library_exists(directory: &Path, name: &str) -> bool {
+    [
+        format!("lib{name}.a"),
+        format!("{name}.lib"),
+        format!("lib{name}.lib"),
+    ]
+    .iter()
+    .any(|file| directory.join(file).is_file())
+}
+
+fn require_static_msvc_crt(statik: bool) {
+    if statik
+        && env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")
+        && !env::var("CARGO_CFG_TARGET_FEATURE")
+            .unwrap_or_default()
+            .split(',')
+            .any(|feature| feature == "crt-static")
+    {
+        panic!(
+            "static FFmpeg on MSVC requires a static CRT; set RUSTFLAGS='-C target-feature=+crt-static'"
+        );
+    }
+}
+
 fn configured_ffmpeg_dir(statik: bool) -> Option<Vec<PathBuf>> {
     let ffmpeg_dir = env::var("FFMPEG_DIR")
         .or_else(|_| env::var("DEP_FFSTATIC_LIBRARY"))
         .ok()
         .map(PathBuf::from)?;
-    if ffmpeg_dir.join("lib/amd64").exists()
+    let library_dir = if ffmpeg_dir.join("lib/amd64").exists()
         && env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("x86_64")
     {
-        println!(
-            "cargo:rustc-link-search=native={}",
-            ffmpeg_dir.join("lib/amd64").to_string_lossy()
-        );
+        ffmpeg_dir.join("lib/amd64")
     } else if ffmpeg_dir.join("lib/armhf").exists()
         && env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("arm")
     {
-        println!(
-            "cargo:rustc-link-search=native={}",
-            ffmpeg_dir.join("lib/armhf").to_string_lossy()
-        );
+        ffmpeg_dir.join("lib/armhf")
     } else if ffmpeg_dir.join("lib/arm64").exists()
         && env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("aarch64")
     {
-        println!(
-            "cargo:rustc-link-search=native={}",
-            ffmpeg_dir.join("lib/arm64").to_string_lossy()
-        );
+        ffmpeg_dir.join("lib/arm64")
     } else {
-        println!(
-            "cargo:rustc-link-search=native={}",
-            ffmpeg_dir.join("lib").to_string_lossy()
-        );
-    }
+        ffmpeg_dir.join("lib")
+    };
+    println!(
+        "cargo:rustc-link-search=native={}",
+        library_dir.to_string_lossy()
+    );
     link_to_libraries(statik);
+    link_sdk_dependencies(&library_dir, statik);
     Some(vec![ffmpeg_dir.join("include")])
 }
 
 fn main() {
     println!("cargo:rerun-if-env-changed=FFMPEG_DIR");
     let statik = env::var("CARGO_FEATURE_STATIC").is_ok();
+    require_static_msvc_crt(statik);
     let ffmpeg_major_version: u32 = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
 
     let sysroot = find_sysroot();

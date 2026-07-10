@@ -1,31 +1,45 @@
-[![ffmpeg-sys-next on crates.io](https://img.shields.io/crates/v/ffmpeg-sys-next?cacheSeconds=3600)](https://crates.io/crates/ffmpeg-sys-next)
-[![build](https://github.com/zmwangx/rust-ffmpeg-sys/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/zmwangx/rust-ffmpeg-sys/actions)
+# ffmpeg-sys-next workspace fork
 
-This is a fork of the abandoned [ffmpeg-sys](https://github.com/meh/rust-ffmpeg-sys) crate. You can find this crate as [ffmpeg-sys-next](https://crates.io/crates/ffmpeg-sys-next) on crates.io.
+This directory vendors [`ffmpeg-sys-next`](https://crates.io/crates/ffmpeg-sys-next) and carries repository-specific changes for static SDK selection. It is not intended to replace or be published over the upstream crate.
 
-This crate contains low level bindings to FFmpeg. You're probably interested in the high level bindings instead: [ffmpeg-next](https://github.com/zmwangx/rust-ffmpeg).
+## Repository-specific behavior
 
-A word on versioning: major and minor versions track major and minor versions of FFmpeg, e.g. 4.2.x of this crate has been updated to support the 4.2.x series of FFmpeg. Patch level is reserved for bug fixes of this crate and does not track FFmpeg patch versions.
+When this fork is injected through `[patch.crates-io]`, the SDK provider selects FFmpeg in this order:
 
-## Feature flags
+1. Use the SDK at `FFMPEG_DIR` when the variable is set.
+2. Build FFmpeg and its configured dependencies when the `build` feature is enabled.
+3. Otherwise, download the pinned SDK release for the current target and verify its SHA-256 checksum.
 
-In addition to feature flags declared in `Cargo.toml`, this crate performs various compile-time version and feature detections and exposes the results in additional flags. These flags are briefly documented below; run `cargo build -vv` to view more details.
+Published SDKs are available for:
 
-- `ffmpeg_<x>_<y>` flags (new in v4.3.2), e.g. `ffmpeg_4_4`, indicating the FFmpeg installation being compiled against is at least version `<x>.<y>`. Currently available:
+- `x86_64-pc-windows-msvc`
+- `x86_64-apple-darwin`
+- `aarch64-apple-darwin`
 
-  - `ffmpeg_3_0`
-  - `ffmpeg_3_1`
-  - `ffmpeg_3_2`
-  - `ffmpeg_3_3`
-  - `ffmpeg_3_1`
-  - `ffmpeg_4_0`
-  - `ffmpeg_4_1`
-  - `ffmpeg_4_2`
-  - `ffmpeg_4_3`
-  - `ffmpeg_4_4`
+Windows MSVC builds require a static C runtime. Set `RUSTFLAGS="-C target-feature=+crt-static"`; the build script rejects mixed static-FFmpeg/dynamic-CRT builds.
 
-- `avcodec_version_greater_than_<x>_<y>` (new in v4.3.2), e.g., `avcodec_version_greater_than_58_90`. The name should be self-explanatory.
+The provider recognizes these variables:
 
-- `ff_api_<feature>`, e.g. `ff_api_vaapi`, corresponding to whether their respective uppercase deprecation guards evaluate to true.
+- `FFMPEG_DIR`: path to a compatible SDK containing `include/` and `lib/`.
+- `FFMPEG_SDK_TAG`: override the pinned SDK release tag.
+- `FFMPEG_SDK_BASE_URL`: override the release download base URL.
+- `CMAKE_GENERATOR`: override the CMake generator used for source builds.
 
-- `ff_api_<feature>_is_defined`, e.g. `ff_api_vappi_is_defined`, similar to above except these are enabled as long as the corresponding deprecation guards are defined.
+Use the fork from a workspace root because Cargo does not propagate patches declared by dependencies:
+
+```toml
+[patch.crates-io]
+ffmpeg-sys-next = { git = "https://github.com/darkskygit/ffmpeg-pipeline", tag = "<release-tag>" }
+```
+
+## Upstream crate
+
+The vendored crate contains low-level FFmpeg bindings and follows the upstream `ffmpeg-sys-next` versioning and feature model. Most applications should use a higher-level wrapper such as [`ffmpeg-next`](https://github.com/zmwangx/rust-ffmpeg).
+
+Besides the features declared in `Cargo.toml`, the build script exposes compile-time FFmpeg version and API detection flags, including:
+
+- `ffmpeg_<major>_<minor>` for detected FFmpeg versions.
+- `avcodec_version_greater_than_<major>_<minor>` for libavcodec version checks.
+- `ff_api_<feature>` and `ff_api_<feature>_is_defined` for FFmpeg compatibility guards.
+
+Run `cargo build -vv` to inspect the complete set emitted for a particular SDK.
