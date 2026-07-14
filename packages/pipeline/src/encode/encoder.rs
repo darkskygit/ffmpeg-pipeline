@@ -22,6 +22,31 @@ impl<'o> Encoder<'o> {
         codec_params: EncodeParams,
     ) -> FFmpegResult<Self> {
         let codec = encoder::find(codec_id).ok_or(FFmpegError::CodecNotFound(codec_id))?;
+        Self::new_with_codec(output, codec, codec_params)
+    }
+
+    /// Creates an encoder by trying implementation names in preference order,
+    /// then falling back to the default encoder for `codec_id`.
+    pub fn new_preferred(
+        output: &'o mut Output,
+        codec_id: Id,
+        preferred_names: &[&str],
+        codec_params: EncodeParams,
+    ) -> FFmpegResult<Self> {
+        let codec = preferred_names
+            .iter()
+            .find_map(|name| encoder::find_by_name(name))
+            .or_else(|| encoder::find(codec_id))
+            .ok_or(FFmpegError::CodecNotFound(codec_id))?;
+        Self::new_with_codec(output, codec, codec_params)
+    }
+
+    fn new_with_codec(
+        output: &'o mut Output,
+        codec: ffmpeg_next::Codec,
+        codec_params: EncodeParams,
+    ) -> FFmpegResult<Self> {
+        let codec_id = codec.id();
         let output_requires_global_header =
             output.format().flags().contains(FormatFlags::GLOBAL_HEADER);
         let mut stream = output.add_stream(codec)?;

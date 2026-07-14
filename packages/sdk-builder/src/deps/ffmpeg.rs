@@ -103,6 +103,11 @@ impl<'a> FFmpegBuilder<'a> {
 
         for codec in self.video_codecs {
             match codec {
+                VideoCodec::MPEG1 => {
+                    video_decoders.push("mpeg1video".to_string());
+                    extra_args.push("--enable-demuxer=mpegvideo".to_string());
+                    extra_args.push("--enable-parser=mpegvideo".to_string());
+                }
                 VideoCodec::H264 => {
                     video_decoders.push("h264".to_string());
                 }
@@ -261,7 +266,7 @@ impl<'a> FFmpegBuilder<'a> {
 
         // 添加视频编解码器和音频编解码器
         let (video_decoders, mut video_encoders, extra_args) = self.get_video_codec_config();
-        let (audio_decoders, audio_encoders) = self.get_audio_codec_config();
+        let (audio_decoders, mut audio_encoders) = self.get_audio_codec_config();
 
         // 合并额外参数
         configure_args.extend(extra_args);
@@ -273,6 +278,9 @@ impl<'a> FFmpegBuilder<'a> {
             }
             if self.video_codecs.contains(&VideoCodec::HEVC) {
                 video_encoders.push("hevc_videotoolbox".to_string());
+            }
+            if self.audio_codecs.contains(&AudioCodec::AAC) {
+                audio_encoders.push("aac_at".to_string());
             }
         }
 
@@ -296,6 +304,8 @@ impl<'a> FFmpegBuilder<'a> {
 
         // 添加硬件加速
         if self.enable_hwaccel {
+            configure_args.push("--enable-audiotoolbox".to_string());
+            configure_args.push("--enable-videotoolbox".to_string());
             configure_args.push("--enable-hwaccel=h264_videotoolbox,hevc_videotoolbox".to_string());
         }
 

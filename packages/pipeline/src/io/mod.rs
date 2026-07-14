@@ -17,6 +17,20 @@ pub fn input_buffer(data: Vec<u8>) -> FFmpegResult<BufferedInput> {
     input_reader(Cursor::new(data))
 }
 
+#[inline(always)]
+pub fn input_buffer_with_format(data: Vec<u8>, format: &str) -> FFmpegResult<BufferedInput> {
+    BufferedInput::from_reader_with_format(Cursor::new(data), Some(format))
+}
+
+#[inline(always)]
+pub fn input_buffer_with_format_options(
+    data: Vec<u8>,
+    format: &str,
+    options: &[(&str, &str)],
+) -> FFmpegResult<BufferedInput> {
+    BufferedInput::from_reader_with_format_and_options(Cursor::new(data), Some(format), options)
+}
+
 pub fn input_reader<R: Readable + 'static>(reader: R) -> FFmpegResult<BufferedInput> {
     BufferedInput::from_reader(reader)
 }

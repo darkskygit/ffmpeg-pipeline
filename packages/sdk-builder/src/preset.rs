@@ -12,7 +12,12 @@ pub fn pipeline_sdk_builder(
         .with_component(Component::AOM)
         .with_component(Component::Opus)
         .with_component(Component::ZLib)
-        .with_video_codecs([VideoCodec::H264, VideoCodec::HEVC, VideoCodec::AV1])
+        .with_video_codecs([
+            VideoCodec::MPEG1,
+            VideoCodec::H264,
+            VideoCodec::HEVC,
+            VideoCodec::AV1,
+        ])
         .with_audio_codecs([
             AudioCodec::Opus,
             AudioCodec::AAC,
@@ -27,6 +32,6 @@ pub fn pipeline_sdk_builder(
             MuxerFormat::MOV,
             MuxerFormat::WAV,
         ])
-        .enable_hwaccel(false)
+        .enable_hwaccel(true)
         .use_cache(true)
 }

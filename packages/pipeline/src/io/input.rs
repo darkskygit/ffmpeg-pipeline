@@ -2,6 +2,7 @@ use super::*;
 use ffmpeg_next::{format::context, sys, Error};
 use std::{
     ffi::c_void,
+    ffi::CString,
     io::SeekFrom,
     ptr::{null, null_mut},
 };
@@ -13,13 +14,28 @@ pub struct BufferedInput {
 }
 
 impl BufferedInput {
-    pub fn from_reader(mut reader: impl Readable + 'static) -> FFmpegResult<Self> {
+    pub fn from_reader(reader: impl Readable + 'static) -> FFmpegResult<Self> {
+        Self::from_reader_with_format(reader, None)
+    }
+
+    pub fn from_reader_with_format(
+        reader: impl Readable + 'static,
+        format: Option<&str>,
+    ) -> FFmpegResult<Self> {
+        Self::from_reader_with_format_and_options(reader, format, &[])
+    }
+
+    pub fn from_reader_with_format_and_options(
+        mut reader: impl Readable + 'static,
+        format: Option<&str>,
+        input_options: &[(&str, &str)],
+    ) -> FFmpegResult<Self> {
         let position = reader.stream_position()?;
         let length = reader.seek(SeekFrom::End(0))?;
         reader.seek(SeekFrom::Start(position))?;
         let cursor = Box::new(reader) as Box<dyn Readable>;
         let ctx = Box::new(AVInputContextData { cursor, length });
-        let (io_ctx, input) = Self::input_buffer(ctx.as_ref())?;
+        let (io_ctx, input) = Self::input_buffer(ctx.as_ref(), format, input_options)?;
         Ok(Self {
             _ctx: ctx,
             input,
@@ -27,17 +43,36 @@ impl BufferedInput {
         })
     }
 
-    fn input_buffer(ctx: &AVInputContextData) -> FFmpegResult<(Box<*mut sys::AVIOContext>, Input)> {
+    fn input_buffer(
+        ctx: &AVInputContextData,
+        format: Option<&str>,
+        input_options: &[(&str, &str)],
+    ) -> FFmpegResult<(Box<*mut sys::AVIOContext>, Input)> {
         let mut options = Dictionary::new();
         options.set("max_streams", "8192");
+        for (key, value) in input_options {
+            options.set(key, value);
+        }
 
         unsafe {
             let avio_ctx = get_avio_context(false, ctx as *const _ as *mut _);
             let mut ps = sys::avformat_alloc_context();
             (*ps).pb = avio_ctx;
 
+            let format_name = format
+                .map(CString::new)
+                .transpose()
+                .map_err(|_| Error::InvalidData)?;
+            let input_format = format_name
+                .as_ref()
+                .map(|name| sys::av_find_input_format(name.as_ptr()))
+                .unwrap_or(null());
+            if format.is_some() && input_format.is_null() {
+                sys::avformat_free_context(ps);
+                return Err(Error::InvalidData.into());
+            }
             let mut opts = options.disown();
-            let res = sys::avformat_open_input(&mut ps, null(), null(), &mut opts);
+            let res = sys::avformat_open_input(&mut ps, null(), input_format, &mut opts);
 
             Dictionary::own(opts);
 

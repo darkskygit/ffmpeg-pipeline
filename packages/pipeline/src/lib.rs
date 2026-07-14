@@ -16,8 +16,8 @@ pub use audio::{transcode_audio_buffer, AudioSpec, AutoAudioBuffer, Resampler};
 pub use decode::{Decoder, Frame, FrameProcess};
 pub use encode::{EncodeParams, Encoder};
 pub use io::{
-    input_buffer, input_file, input_reader, output_buffer, output_file, output_writer,
-    read_attachment,
+    input_buffer, input_buffer_with_format, input_buffer_with_format_options, input_file,
+    input_reader, output_buffer, output_file, output_writer, read_attachment,
 };
 pub use parse::{parse_stream_info, parse_video_group};
 pub use remux::{remux, RemuxRequest, RemuxStream};
@@ -25,7 +25,7 @@ pub use result::{FFmpegError, FFmpegResult};
 pub use scaler::{Scaler, ScalingAlgorithm};
 pub use types::{
     AudioFrame, ChannelLayout, CodecId, FrameCalculation, FrameSize, Input, MediaType, Output,
-    Sample, SampleType, Stream, StreamDecoder, StreamEncoder, StreamFormat, StreamFrame,
+    Rational, Sample, SampleType, Stream, StreamDecoder, StreamEncoder, StreamFormat, StreamFrame,
     VideoFrame, VideoGroups, VideoInfo, VideoPixel,
 };
 

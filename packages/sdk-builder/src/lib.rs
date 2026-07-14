@@ -1,5 +1,5 @@
 #[cfg(feature = "build-from-source")]
-use std::{collections::HashSet, env, io::Result, path::PathBuf, thread};
+use std::{collections::HashSet, env, fs, io::Result, path::PathBuf, thread};
 
 #[cfg(feature = "build-from-source")]
 mod builder;
@@ -214,6 +214,19 @@ impl FFmpegCompiler {
             dynamic_link_libs.push("c++".to_string());
             dynamic_link_libs.push("bz2".to_string());
             dynamic_link_libs.push("z".to_string());
+            if self.enable_hwaccel {
+                dynamic_link_libs.extend(
+                    [
+                        "framework=CoreFoundation",
+                        "framework=AudioToolbox",
+                        "framework=CoreMedia",
+                        "framework=CoreVideo",
+                        "framework=Security",
+                        "framework=VideoToolbox",
+                    ]
+                    .map(str::to_string),
+                );
+            }
         }
 
         #[cfg(target_os = "windows")]
@@ -238,11 +251,38 @@ impl FFmpegCompiler {
     /// 检查缓存是否有效
     fn check_cache(&self) -> bool {
         utils::check_cache(&self.build_dir, &self.source_dir)
+            && fs::read_to_string(self.build_dir.join(".ffmpeg_build_config"))
+                .is_ok_and(|cached| cached == self.cache_signature())
     }
 
     /// 更新缓存
     fn update_cache(&self) -> Result<()> {
-        utils::update_cache(&self.build_dir)
+        utils::update_cache(&self.build_dir)?;
+        fs::write(
+            self.build_dir.join(".ffmpeg_build_config"),
+            self.cache_signature(),
+        )
+    }
+
+    fn cache_signature(&self) -> String {
+        fn sorted_debug<T: std::fmt::Debug>(values: &HashSet<T>) -> String {
+            let mut values = values
+                .iter()
+                .map(|value| format!("{value:?}"))
+                .collect::<Vec<_>>();
+            values.sort_unstable();
+            values.join(",")
+        }
+
+        format!(
+            "builder_revision=3\nplatform={}\ncomponents={}\naudio_codecs={}\nvideo_codecs={}\nmuxer_formats={}\nhwaccel={}\n",
+            self.platform,
+            sorted_debug(&self.components),
+            sorted_debug(&self.audio_codecs),
+            sorted_debug(&self.video_codecs),
+            sorted_debug(&self.muxer_formats),
+            self.enable_hwaccel,
+        )
     }
 
     // 平台特定的构建方法在各自的模块文件中实现

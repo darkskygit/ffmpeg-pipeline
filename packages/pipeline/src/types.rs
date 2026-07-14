@@ -19,7 +19,7 @@ pub use ffmpeg_next::{
     },
     media::Type as MediaType,
     util::frame::{audio::Audio as AudioFrame, video::Video as VideoFrame},
-    ChannelLayout, Stream,
+    ChannelLayout, Rational, Stream,
 };
 
 #[derive(Default, Clone, Copy)]

@@ -27,6 +27,8 @@ pub enum AudioCodec {
 /// 视频编解码器
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VideoCodec {
+    /// MPEG-1 Video 解码器（用于旧资源规整）
+    MPEG1,
     /// H.264/AVC 视频编解码器
     H264,
     /// H.265/HEVC 视频编解码器
