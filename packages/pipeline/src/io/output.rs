@@ -90,30 +90,24 @@ impl AsMut<Output> for BufferedOutput {
 
 #[cfg(test)]
 mod tests {
-    use ffmpeg_next::codec::Id;
-
     use super::*;
-    use std::{fs::File, io::Read};
 
     fn init() {
         initialize(log::Level::Debug).unwrap();
     }
 
-    fn get_buffer<P: AsRef<Path>>(path: P) -> Vec<u8> {
-        let mut file = File::open(path).unwrap();
-        let mut data = Vec::new();
-        file.read_to_end(&mut data).unwrap();
-        data
-    }
-
     #[test]
     fn test_buffered_input() {
         init();
-        let buffer = get_buffer("./tmp/1.m4a");
-        let mut input = BufferedInput::from_reader(Cursor::new(buffer)).unwrap();
-        let decoder = Decoder::new_with_audio(input.as_mut(), 0, FrameProcess::Decode).unwrap();
+        let mut input = BufferedInput::from_reader_with_format(
+            Cursor::new(crate::tests::encoded_ivf(2)),
+            Some("ivf"),
+        )
+        .unwrap();
+        let decoder = Decoder::new_with_video(input.as_mut(), 0, FrameProcess::Decode).unwrap();
 
         for (idx, frame) in decoder.enumerate() {
+            let frame = frame.unwrap();
             match frame {
                 Frame::Frame(StreamFrame::Audio(audio)) => {
                     println!("frame: {:?}", audio.format());
@@ -134,16 +128,8 @@ mod tests {
     #[test]
     fn test_buffered_output() {
         init();
-        let buffer = get_buffer("./tmp/1.m4a");
-        let mut input = BufferedInput::from_reader(Cursor::new(buffer)).unwrap();
-        let mut output = BufferedOutput::from_writer(Cursor::new(vec![]), "opus").unwrap();
-
-        let decoder = Decoder::new_with_audio(input.as_mut(), 0, FrameProcess::Decode).unwrap();
-        let params = EncodeParams::from(&decoder)
-            .with_bitrate(64 * 1024)
-            .with_vbr(true);
-        let encoder = Encoder::new(output.as_mut(), Id::OPUS, params).unwrap();
-        let _buffer = AutoAudioBuffer::new(&decoder, &encoder).unwrap();
+        let output = crate::tests::encoded_ogg();
+        assert!(output.starts_with(b"OggS"));
 
         // for (idx, frame) in frames.enumerate() {
         //     match frame {

@@ -115,19 +115,18 @@ impl AsMut<Input> for BufferedInput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs::File, io::Read, path::Path};
 
     #[test]
     fn test_buffered_input() {
-        let path = Path::new("../../tests/assets/test.m4a");
-        let mut file = File::open(path).unwrap();
-        let mut data = Vec::new();
-        file.read_to_end(&mut data).unwrap();
-
-        let mut input = BufferedInput::from_reader(Cursor::new(data)).unwrap();
-        let frames = Decoder::new_with_audio(input.as_mut(), 0, FrameProcess::Decode).unwrap();
+        let mut input = BufferedInput::from_reader_with_format(
+            Cursor::new(crate::tests::encoded_ivf(2)),
+            Some("ivf"),
+        )
+        .unwrap();
+        let frames = Decoder::new_with_video(input.as_mut(), 0, FrameProcess::Decode).unwrap();
 
         for (idx, frame) in frames.enumerate() {
+            let frame = frame.unwrap();
             match frame {
                 Frame::Frame(StreamFrame::Audio(audio)) => {
                     println!("frame: {:?}", audio.format());

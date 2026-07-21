@@ -1,8 +1,8 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use ffmpeg_next::{codec, format, Rational};
+use ffmpeg_next::{codec, Packet, Rational};
 
-use crate::FFmpegResult;
+use crate::{input_file, output_file, FFmpegResult};
 
 #[derive(Clone, Debug, Default)]
 pub struct RemuxStream {
@@ -21,11 +21,12 @@ pub struct RemuxRequest {
 }
 
 pub fn remux(request: &RemuxRequest) -> FFmpegResult {
-    let mut input = format::input(&request.input)?;
-    let mut output = format::output(&request.output)?;
+    let mut input = input_file(&request.input)?;
+    let mut output = output_file(&request.output)?;
     let mut stream_mapping = HashMap::<usize, usize>::new();
     let mut input_time_bases = HashMap::<usize, Rational>::new();
     let mut stream_metadata = HashMap::<usize, RemuxStream>::new();
+    let mut next_dts = HashMap::<usize, i64>::new();
 
     for stream in &request.streams {
         if stream_mapping.contains_key(&stream.input_index) {
@@ -84,10 +85,54 @@ pub fn remux(request: &RemuxRequest) -> FFmpegResult {
             .copied()
             .unwrap_or(stream.time_base());
         packet.rescale_ts(input_time_base, output_stream.time_base());
+        normalize_timestamps(&mut packet, output_index, &mut next_dts);
         packet.set_position(-1);
         packet.set_stream(output_index);
         packet.write_interleaved(&mut output)?;
     }
     output.write_trailer()?;
     Ok(())
+}
+
+fn normalize_timestamps(packet: &mut Packet, stream: usize, next_dts: &mut HashMap<usize, i64>) {
+    let Some(dts) = packet.dts() else {
+        return;
+    };
+    let adjusted_dts = next_dts
+        .get(&stream)
+        .copied()
+        .map_or(dts, |next| dts.max(next));
+    if adjusted_dts != dts {
+        let offset = adjusted_dts.saturating_sub(dts);
+        packet.set_dts(Some(adjusted_dts));
+        packet.set_pts(packet.pts().map(|pts| pts.saturating_add(offset)));
+    }
+    next_dts.insert(
+        stream,
+        adjusted_dts.saturating_add(packet.duration().max(1)),
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn remux_repairs_backwards_dts_without_changing_composition_offset() {
+        let mut next_dts = HashMap::new();
+        let mut first = Packet::empty();
+        first.set_dts(Some(12));
+        first.set_pts(Some(15));
+        first.set_duration(10);
+        normalize_timestamps(&mut first, 0, &mut next_dts);
+
+        let mut second = Packet::empty();
+        second.set_dts(Some(3));
+        second.set_pts(Some(5));
+        second.set_duration(10);
+        normalize_timestamps(&mut second, 0, &mut next_dts);
+
+        assert_eq!(second.dts(), Some(22));
+        assert_eq!(second.pts(), Some(24));
+    }
 }

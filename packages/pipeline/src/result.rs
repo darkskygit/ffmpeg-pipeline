@@ -19,6 +19,32 @@ pub enum FFmpegError {
     InvalidFrameType(String),
     #[error("Invalid stream type: {0}")]
     InvalidStreamType(String),
+    #[error(
+        "Decoder {operation} failed on stream {stream} at packet {packet_position:?}: {source}"
+    )]
+    Decoder {
+        operation: &'static str,
+        stream: usize,
+        packet_position: Option<isize>,
+        #[source]
+        source: ffmpeg_next::Error,
+    },
+}
+
+impl FFmpegError {
+    pub(crate) fn decoder(
+        operation: &'static str,
+        stream: usize,
+        packet_position: Option<isize>,
+        source: ffmpeg_next::Error,
+    ) -> Self {
+        Self::Decoder {
+            operation,
+            stream,
+            packet_position,
+            source,
+        }
+    }
 }
 
 impl PartialEq<FFmpegError> for FFmpegError {
@@ -29,6 +55,20 @@ impl PartialEq<FFmpegError> for FFmpegError {
             (FFmpegError::StreamNotFound(e1), FFmpegError::StreamNotFound(e2)) => e1 == e2,
             (FFmpegError::CodecNotFound(e1), FFmpegError::CodecNotFound(e2)) => e1 == e2,
             (FFmpegError::InvalidFrameType(e1), FFmpegError::InvalidFrameType(e2)) => e1 == e2,
+            (
+                FFmpegError::Decoder {
+                    operation: o1,
+                    stream: s1,
+                    packet_position: p1,
+                    source: e1,
+                },
+                FFmpegError::Decoder {
+                    operation: o2,
+                    stream: s2,
+                    packet_position: p2,
+                    source: e2,
+                },
+            ) => o1 == o2 && s1 == s2 && p1 == p2 && e1 == e2,
             _ => false,
         }
     }

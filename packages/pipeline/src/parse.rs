@@ -47,9 +47,7 @@ pub fn parse_stream_info(stream: &Stream) -> FFmpegResult<VideoInfo> {
     );
 
     let mut codec = Context::from_parameters(stream.parameters())?;
-    codec.set_threading(ThreadConfig::count(
-        std::thread::available_parallelism()?.get(),
-    ));
+    codec.set_threading(ThreadConfig::count(1));
     if codec.medium() == MediaType::Video {
         let video = codec.decoder().video()?;
         info.size = info
@@ -142,94 +140,24 @@ pub fn parse_video_stream_frame_count(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rayon::prelude::*;
-    use std::{
-        panic::{catch_unwind, AssertUnwindSafe},
-        path::PathBuf,
-    };
-
-    fn get_paths() -> Vec<PathBuf> {
-        std::fs::read_dir("../../tests/assets")
-            .unwrap()
-            .filter_map(|p| p.ok().map(|p| p.path()))
-            .filter(|p| {
-                p.is_file()
-                    && p.extension()
-                        .and_then(|s| s.to_str())
-                        .map(|s| s.to_lowercase())
-                        .unwrap_or_default()
-                        .ends_with("mkv")
-            })
-            .collect::<Vec<_>>()
-    }
-
-    fn diff_video_groups(file: &Path) -> FFmpegResult<()> {
-        let info = parse_video_group(file, FrameCalculation::Fast)?;
-        let info1 = parse_video_group(file, FrameCalculation::Full)?;
-        assert_json_diff::assert_json_matches_no_panic(
-            &info,
-            &info1,
-            assert_json_diff::Config::new(assert_json_diff::CompareMode::Strict),
-        )
-        .map_err(std::io::Error::other)?;
-
-        Ok(())
-    }
 
     #[test]
     fn test_parse_video_groups() {
-        initialize(log::Level::Error).unwrap();
-
-        let paths = get_paths();
-
-        paths.par_iter().enumerate().for_each(|(i, file)| {
-            if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
-                if let Err(e) = diff_video_groups(file) {
-                    debug!("file {}: {}, error: {:?}", i, file.display(), e);
-                }
-            })) {
-                debug!("file {}: {}, crash: {:?}", i, file.display(), e);
-            }
-        });
-    }
-
-    fn check_video_frame_count(file: &Path) -> FFmpegResult {
-        let info = parse_video_group(file, FrameCalculation::Skip)?;
-        debug!(
-            "parse cost: {:?}",
-            info.values()
-                .fold(std::time::Duration::new(0, 0), |acc, i| acc + i.cost)
-        );
-        let mut info = info
-            .values()
-            .filter(|i| i.stream_type == "Video")
-            .collect::<Vec<_>>();
-        info.sort_by_key(|info| info.stream);
-
-        for stream in info.iter() {
-            assert!(
-                parse_video_stream_frame_count(file, stream.stream, FrameCalculation::Fast)?
-                    .is_some()
-            );
-        }
-
-        Ok(())
+        assert_eq!(adjust_precision_of_ratio(30_000.0, 1_001.0), 29.97);
+        assert_eq!(adjust_precision_of_ratio(24.0, 1.0), 24.0);
     }
 
     #[test]
     fn test_frame_counting() {
         initialize(log::Level::Error).unwrap();
-
-        let paths = get_paths();
-
-        paths.par_iter().enumerate().for_each(|(i, file)| {
-            if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
-                if let Err(e) = check_video_frame_count(file) {
-                    debug!("file {}: {}, error: {:?}", i, file.display(), e);
-                }
-            })) {
-                debug!("file {}: {}, crash: {:?}", i, file.display(), e);
-            }
-        });
+        let path =
+            std::env::temp_dir().join(format!("ffmpeg-pipeline-parse-{}.ivf", std::process::id()));
+        std::fs::write(&path, crate::tests::encoded_ivf(3)).unwrap();
+        let groups = parse_video_group(&path, FrameCalculation::Full).unwrap();
+        std::fs::remove_file(path).unwrap();
+        assert_eq!(groups.len(), 1);
+        let stream = groups.values().next().unwrap();
+        assert_eq!(stream.stream_type, "Video");
+        assert_eq!(stream.frames, Some(3));
     }
 }

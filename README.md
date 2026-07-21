@@ -22,7 +22,7 @@
 
 ```toml
 [dependencies]
-ffmpeg-pipeline = "0.1"
+ffmpeg-pipeline = "0.2"
 log = "0.4"
 ```
 
@@ -30,7 +30,7 @@ The crate links FFmpeg statically. Provide a compatible FFmpeg 7.1 installation 
 
 ```toml
 [dependencies]
-ffmpeg-pipeline = { version = "0.1", features = ["build-from-source"] }
+ffmpeg-pipeline = { version = "0.2", features = ["build-from-source"] }
 ```
 
 The available codecs and formats are determined by the linked FFmpeg build. Platform system libraries and frameworks may still be required; third-party FFmpeg dependencies must be linked statically.

@@ -116,6 +116,7 @@ impl<'a> FFmpegBuilder<'a> {
                 }
                 VideoCodec::AV1 => {
                     video_decoders.push("libaom_av1".to_string());
+                    extra_args.push("--enable-demuxer=ivf".to_string());
                     extra_args.push("--enable-parser=av1".to_string());
                 }
                 VideoCodec::VP9 => {

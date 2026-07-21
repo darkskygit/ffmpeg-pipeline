@@ -86,42 +86,17 @@ pub fn read_attachment<P: AsRef<Path>>(path: P, index: usize) -> FFmpegResult<Ve
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rayon::prelude::*;
-    use std::panic::{catch_unwind, AssertUnwindSafe};
 
     #[test]
     fn test_read_attachment() {
         initialize(log::Level::Error).unwrap();
-
-        let paths = std::fs::read_dir("/Users/ds/Resilio Sync/CG")
-            .unwrap()
-            .filter_map(|p| p.ok().map(|p| p.path()))
-            .filter(|p| {
-                p.is_file()
-                    && p.extension()
-                        .and_then(|s| s.to_str())
-                        .map(|s| s.to_lowercase())
-                        .unwrap_or_default()
-                        .ends_with("mkv")
-            })
-            .collect::<Vec<_>>();
-
-        paths.par_iter().for_each(|file| {
-            if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
-                match parse_video_group(file, FrameCalculation::Skip) {
-                    Ok(groups) => {
-                        for group in groups.values() {
-                            if group.stream_type != "Attachment" {
-                                continue;
-                            }
-                            assert!(read_attachment(file, group.stream as usize).is_ok());
-                        }
-                    }
-                    Err(e) => debug!("file {}: error: {:?}", file.display(), e),
-                }
-            })) {
-                debug!("file {}: crash: {:?}", file.display(), e);
-            }
-        });
+        let path = std::env::temp_dir().join(format!(
+            "ffmpeg-pipeline-attachment-{}.ivf",
+            std::process::id()
+        ));
+        std::fs::write(&path, crate::tests::encoded_ivf(1)).unwrap();
+        let result = read_attachment(&path, 0);
+        std::fs::remove_file(path).unwrap();
+        assert!(matches!(result, Err(FFmpegError::AttachmentNotFound(0))));
     }
 }

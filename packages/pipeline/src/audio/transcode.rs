@@ -32,6 +32,7 @@ pub fn transcode_audio_buffer(
             encoder.encode_frame()
         };
         for frame in decoder {
+            let frame = frame?;
             if let Frame::Frame(StreamFrame::Audio(frame)) = frame {
                 buffer.add_frame(&frame)?;
                 buffer.recv_frames(&mut encode)?;
