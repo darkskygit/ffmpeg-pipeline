@@ -2,9 +2,8 @@ use super::*;
 use ffmpeg_next::{
     codec::{context::Context, Compliance, Flags as CodecFlags, Id},
     encoder,
-    ffi::av_opt_set_int,
     format::{context::Output, Flags as FormatFlags},
-    Packet, Rational,
+    Dictionary, Packet, Rational,
 };
 
 pub struct Encoder<'o> {
@@ -62,6 +61,7 @@ impl<'o> Encoder<'o> {
                 rate,
                 time_base,
                 vbr,
+                opus,
             } if codec.is_audio() => {
                 let codec = codec.audio()?;
                 let mut encoder = encoder.audio()?;
@@ -96,20 +96,16 @@ impl<'o> Encoder<'o> {
                 }
                 stream.set_time_base(time_base);
 
-                let mut encoder = encoder.open_as(codec)?;
-                if vbr && encoder.id() == Id::OPUS {
-                    unsafe {
-                        match av_opt_set_int(
-                            (*encoder.as_mut_ptr()).priv_data,
-                            c"vbr".as_ptr(),
-                            2,
-                            0,
-                        ) {
-                            0 => Ok(()),
-                            e => Err(ffmpeg_next::Error::from(e)),
-                        }
-                    }?;
+                let mut options = Dictionary::new();
+                if codec_id == Id::OPUS {
+                    options.set("vbr", if vbr { "on" } else { "off" });
+                    if let Some(opus) = opus {
+                        options.set("application", opus.application.as_str());
+                        options.set("compression_level", &opus.complexity.to_string());
+                        options.set("frame_duration", &opus.frame_duration_ms.to_string());
+                    }
                 }
+                let encoder = encoder.open_as_with(codec, options)?;
 
                 stream.set_parameters(&encoder);
                 StreamEncoder::Audio(encoder)

@@ -149,6 +149,9 @@ impl<'a> FFmpegBuilder<'a> {
                 AudioCodec::FLAC => {
                     audio_decoders.push("flac".to_string());
                 }
+                AudioCodec::Vorbis => {
+                    audio_decoders.push("vorbis".to_string());
+                }
                 AudioCodec::PCM => {
                     audio_decoders.extend(
                         [

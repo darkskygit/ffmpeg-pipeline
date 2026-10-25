@@ -20,6 +20,8 @@ pub enum AudioCodec {
     MP3,
     /// FLAC 无损音频编解码器
     FLAC,
+    /// Ogg Vorbis 音频解码器
+    Vorbis,
     /// PCM 音频编解码器
     PCM,
 }

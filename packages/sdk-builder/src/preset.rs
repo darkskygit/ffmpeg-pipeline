@@ -23,6 +23,7 @@ pub fn pipeline_sdk_builder(
             AudioCodec::AAC,
             AudioCodec::MP3,
             AudioCodec::FLAC,
+            AudioCodec::Vorbis,
             AudioCodec::PCM,
         ])
         .with_muxer_formats([

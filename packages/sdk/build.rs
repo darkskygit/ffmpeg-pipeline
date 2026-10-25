@@ -43,7 +43,10 @@ fn main() -> io::Result<()> {
 #[cfg(feature = "build-from-source")]
 fn build_from_source() -> io::Result<()> {
     let output_dir = PathBuf::from(required_env("OUT_DIR")?);
-    pipeline_sdk_builder(output_dir.join("sources"), &output_dir)
+    let sources_dir = env::var("FFMPEG_SDK_SOURCES")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| output_dir.join("sources"));
+    pipeline_sdk_builder(sources_dir, &output_dir)
         .verbose(true)
         .build()
         .compile()?;

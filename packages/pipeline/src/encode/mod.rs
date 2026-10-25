@@ -4,7 +4,7 @@ mod params;
 use super::*;
 
 pub use encoder::Encoder;
-pub use params::EncodeParams;
+pub use params::{EncodeParams, OpusApplication, OpusEncodeOptions};
 
 #[cfg(test)]
 mod tests {

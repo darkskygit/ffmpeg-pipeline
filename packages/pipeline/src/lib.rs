@@ -14,7 +14,7 @@ mod types;
 pub(crate) use audio::decoder_channel_layout;
 pub use audio::{transcode_audio_buffer, AudioSpec, AutoAudioBuffer, Resampler};
 pub use decode::{Decoder, Frame, FrameProcess};
-pub use encode::{EncodeParams, Encoder};
+pub use encode::{EncodeParams, Encoder, OpusApplication, OpusEncodeOptions};
 pub use io::{
     input_buffer, input_buffer_with_format, input_buffer_with_format_options, input_file,
     input_reader, output_buffer, output_file, output_writer, read_attachment,
