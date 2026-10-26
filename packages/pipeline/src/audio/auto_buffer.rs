@@ -44,7 +44,17 @@ impl AutoAudioBuffer {
 
             out.set_sample_format(dst.format);
             out.set_channel_layout(dst.channel_layout);
-            out.set_sample_rate(dst.sample_rate);
+            // ffmpeg-next 7.1 `set_sample_rate` writes an 8-byte i64 into
+            // abuffersink's `sample_rates` (an int list); graph negotiation
+            // then reads the upper zero half as a second candidate rate and,
+            // when format and rate both mismatch, configures aresample with
+            // output rate 0 (EINVAL). Write exactly one 4-byte int instead,
+            // matching the pix_fmts/sample_fmts setters above.
+            let _ = ffmpeg_next::option::Settable::set(
+                &mut out,
+                "sample_rates",
+                &(dst.sample_rate as i32),
+            );
         }
 
         graph.output("in", 0)?.input("out", 0)?.parse("anull")?;
